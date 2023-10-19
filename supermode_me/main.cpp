@@ -1,10 +1,10 @@
-#include "supermode_ctrl.h"
+#include "supermode.h"
 
 int main()
 {
 	std::cout << "START ME SECOND!!!\n";
 
-	while (!supermode::load())
+	while (!supermode_comm::load())
 	{
 		std::cout << "retrying to load...\n";
 		Sleep(1000);
@@ -13,17 +13,19 @@ int main()
 	Sleep(5000);
 	system("pause");
 
-	byte buf[16] = { 0 };
-	
-	std::cout << "Reading from phys 0x1ad000 from now on...\n";
-	
-	while (true)
-	{
-		supermode::read_physical_memory(0x1ad000, 15, (uint64_t*)buf);
-		for (int i = 0; i < 16; i++)
-			std::cout << std::hex << (int)buf[i] << std::endl;
-		Sleep(10000000000);
-	}
+	uint64_t base = supermode::attach("explorer.exe");
+
+	std::cout << base << std::endl;
+	system("pause");
+
+	byte buf[3] = { 0 };
+
+	supermode_comm::read_physical_memory(0x1ad000, 2, (uint64_t*)buf);
+
+	//sm.read_physical_memory(0x1ad000, (uintptr_t)buf, 2);
+	std::cout << buf[0] << std::endl;
+
+	system("pause");
 
 	return 1;
 }

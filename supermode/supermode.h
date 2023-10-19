@@ -363,6 +363,8 @@ namespace supermode
 			j["mal_pointer_pte_indices"][std::to_string(i)] = mal_pointer_pte_ind[i];
 		}
 
+		j["cr3"] = wnbios.get_system_dirbase();
+
 		std::ofstream out_file("C:\\indices.json");
 		out_file << j.dump();
 	}

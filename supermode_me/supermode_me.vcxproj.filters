@@ -18,12 +18,18 @@
     <ClCompile Include="main.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="supermode.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="supermode_ctrl.h">
+    <ClInclude Include="supermode_comm.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="json.hpp">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="supermode.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>

@@ -371,7 +371,7 @@ uintptr_t wnbios_lib::get_process_base(const char* image_name)
 	if (!kprocess_initial)
 		return NULL;
 
-	//printf("system_kprocess: %llx\n", kprocess_initial);
+	printf("system_kprocess: %llx\n", kprocess_initial);
 	//printf("system_cr3: %llx\n", cr3);
 
 	const unsigned long limit = 400;

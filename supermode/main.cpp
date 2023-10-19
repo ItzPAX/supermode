@@ -16,10 +16,11 @@ int main()
 	supermode::insert_first_malicious_pte();
 	supermode::insert_second_malicious_pte();
 
-	supermode::wnbios.unload_driver();
-
 	std::cout << "saving indices for target application...\n";
 	supermode::save_indices_for_target();
+
+	std::cout << "unloading wnbios...\n";
+	supermode::wnbios.unload_driver();
 
 	std::cout << "target is now supermoded lets pray the system doesnt BSOD :(\n";
 

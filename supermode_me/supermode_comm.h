@@ -1,13 +1,10 @@
 #pragma once
 #include <Windows.h>
 #include <iostream>
-#include <unordered_map>
 #include <fstream>
-#include <streambuf>
-#include <string>
 #include "json.hpp"
 
-namespace supermode
+namespace supermode_comm
 {
 	typedef struct _PTE
 	{
@@ -43,27 +40,34 @@ namespace supermode
 		PT
 	};
 
-	uint64_t mal_pointer_pte_ind[4];
-	uint64_t mal_pte_ind[4];
+	static uint64_t mal_pointer_pte_ind[4];
+	static uint64_t mal_pte_ind[4];
+
+	static uint64_t system_cr3;
+
+	static uint64_t current_pfn = 0;
 
 	struct PTE_PFN
 	{
 		uint64_t pfn;
 		uint64_t offset;
 	};
-	PTE_PFN mal_pte_pfn;
+	static PTE_PFN mal_pte_pfn;
 	
 	// rudamentary ahhhh data transmition
-	bool load()
+	static bool load()
 	{
 		std::ifstream ifs("C:\\indices.json");
 		if (!ifs.is_open())
 			return false;
+
 		std::string content((std::istreambuf_iterator<char>(ifs)),
 			(std::istreambuf_iterator<char>()));
 
 		nlohmann::json j = nlohmann::json::parse(content);
 
+		system_cr3 = j["cr3"].get<uint64_t>();
+		std::cout << "CR3: 0x" << std::hex << system_cr3 << std::dec << std::endl;
 
 		for (int i = 0; i <= PT; i++)
 		{
@@ -72,14 +76,15 @@ namespace supermode
 		}
 		for (int i = 0; i <= PT; i++)
 		{
-			mal_pte_ind[i] = j["mal_pte_indices"][std::to_string(i)].get<uint64_t>();
+			if (mal_pte_ind[i] == 0)
+				mal_pte_ind[i] = j["mal_pte_indices"][std::to_string(i)].get<uint64_t>();
 			std::cout << i << ":" << mal_pte_ind[i] << std::endl;
 		}
 
 		return true;
 	}
 
-	PTE_PFN calc_pfnpte_from_addr(uint64_t addr)
+	static PTE_PFN calc_pfnpte_from_addr(uint64_t addr)
 	{
 		PTE_PFN pte_pfn;
 		uint64_t pfn = addr >> 12;
@@ -88,7 +93,7 @@ namespace supermode
 		return pte_pfn;
 	}
 
-	uint64_t generate_virtual_address(uint64_t pml4, uint64_t pdpt, uint64_t pd, uint64_t pt, uint64_t offset)
+	static uint64_t generate_virtual_address(uint64_t pml4, uint64_t pdpt, uint64_t pd, uint64_t pt, uint64_t offset)
 	{
 		uint64_t virtual_address =
 			(pml4 << 39) |
@@ -100,8 +105,10 @@ namespace supermode
 		return virtual_address;
 	}
 
-	void change_mal_pt_pfn(uint64_t pfn)
+	static void change_mal_pt_pfn(uint64_t pfn)
 	{
+		current_pfn = pfn;
+
 		PTE mal_pte;
 		mal_pte.Present = 1;
 		mal_pte.ReadWrite = 1;
@@ -110,17 +117,34 @@ namespace supermode
 		mal_pte.ExecuteDisable = 1;
 		mal_pte.Dirty = 1;
 		mal_pte.Accessed = 1;
+		mal_pte.PageCacheDisable = 1;
+		mal_pte.PageWriteThrough = 1;
+
+		Sleep(1);
 
 		uint64_t va = generate_virtual_address(mal_pointer_pte_ind[PML4], mal_pointer_pte_ind[PDPT], mal_pointer_pte_ind[PD], mal_pointer_pte_ind[PT], 0);
 		memcpy((void*)va, &mal_pte, sizeof(PTE));
 	}
 
-	void read_physical_memory(uint64_t addr, uint64_t size, uint64_t* buf)
+	static void read_physical_memory(uint64_t addr, uint64_t size, uint64_t* buf)
 	{
 		PTE_PFN pfn = calc_pfnpte_from_addr(addr);
-		change_mal_pt_pfn(pfn.pfn);
+
+		if (current_pfn != pfn.pfn)
+			change_mal_pt_pfn(pfn.pfn);
 
 		uint64_t va = generate_virtual_address(mal_pte_ind[PML4], mal_pte_ind[PDPT], mal_pte_ind[PD], mal_pte_ind[PT], pfn.offset);
 		memcpy((void*)buf, (void*)va, size);
+	}
+
+	static void write_physical_memory(uint64_t addr, uint64_t size, uint64_t* data)
+	{
+		PTE_PFN pfn = calc_pfnpte_from_addr(addr);
+
+		if (current_pfn != pfn.pfn)
+			change_mal_pt_pfn(pfn.pfn);
+
+		uint64_t va = generate_virtual_address(mal_pte_ind[PML4], mal_pte_ind[PDPT], mal_pte_ind[PD], mal_pte_ind[PT], pfn.offset);
+		memcpy((void*)va, (void*)data, size);
 	}
 }
