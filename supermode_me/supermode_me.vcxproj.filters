@@ -15,18 +15,12 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="drv.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="drv.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="supermode.h">
+    <ClInclude Include="supermode_ctrl.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="json.hpp">

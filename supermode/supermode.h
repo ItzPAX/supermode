@@ -2,6 +2,7 @@
 #include "drv.h"
 #include <iostream>
 #include <unordered_map>
+#include "json.hpp"
 
 namespace supermode
 {
@@ -290,7 +291,7 @@ namespace supermode
 		memcpy((void*)buf, (void*)va, size);
 	}
 
-	// this pte will point to our other malicious pdpte we can modify from our UM program then
+	// this pte will point to physical mem
 	void insert_first_malicious_pte()
 	{
 		// find a free pte and populate other indices while at it
@@ -320,7 +321,7 @@ namespace supermode
 		std::cout << "inserted first malicious pte at index " << mal_pte_ind[PT] << " [" << std::hex << mal_pte_phys << "] " << std::dec << std::endl;
 	}
 
-	// this pte will point to our other malicious pdpte we can modify from our UM program then
+	// this pte will point to our other malicious pte we can modify from our UM program then
 	void insert_second_malicious_pte()
 	{
 		// find a free pte and populate other indices while at it
@@ -347,5 +348,22 @@ namespace supermode
 		
 		wnbios.write_physical_memory(mal_pte_phys, &mal_pte, sizeof(PTE));
 		std::cout << "inserted second malicious pdpt at index " << mal_pointer_pte_ind[PT] << " [" << std::hex << mal_pte_phys << "] " << std::dec << " pointing to pfn " << mal_pte_pfn.pfn << std::endl;
+	}
+
+	// goofy ahh
+	void save_indices_for_target()
+	{
+		nlohmann::json j;
+		j["mal_pte_indices"] = {};
+		j["mal_pointer_pte_indices"] = {};
+
+		for (int i = 0; i <= PT; i++)
+		{
+			j["mal_pte_indices"][std::to_string(i)] = mal_pte_ind[i];
+			j["mal_pointer_pte_indices"][std::to_string(i)] = mal_pointer_pte_ind[i];
+		}
+
+		std::ofstream out_file("C:\\indices.json");
+		out_file << j.dump();
 	}
 }

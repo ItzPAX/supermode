@@ -2,24 +2,28 @@
 
 int main()
 {
-	supermode::wnbios.get_process_base("attacker.exe");
+	remove("C:\\indices.json");
+	std::cout << "START ME FIRST!!!\n";
+
+	while (!supermode::wnbios.get_process_base("supermode_me.exe"))
+	{
+		std::cout << "Waiting for target application...\n";
+		Sleep(1000);
+	}
+
+	Sleep(5000);
+
 	supermode::insert_first_malicious_pte();
 	supermode::insert_second_malicious_pte();
 
-	// i cannot believe but we are done here brotha
 	supermode::wnbios.unload_driver();
 
+	std::cout << "saving indices for target application...\n";
+	supermode::save_indices_for_target();
+
+	std::cout << "target is now supermoded lets pray the system doesnt BSOD :(\n";
+
 	system("pause");
-
-	byte buf[16] = { 0 };
-
-	std::cout << "Reading from phys 0x1ad000 from now on...\n";
-
-	while (true)
-	{
-		supermode::read_physical_memory(0x1ad000, 15, (uint64_t*)buf);
-		Sleep(10);
-	}
 
 	return 1;
 }
