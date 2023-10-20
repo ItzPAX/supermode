@@ -1,8 +1,35 @@
-#include "supermode.h"
+#include "rwptm.h"
 
-int main()
+void startup()
 {
-	std::cout << "START ME SECOND!!!\n";
+	std::cout << "start the game now!\n";
+	system("pause");
+
+	rwptm::init("VALORANT-Win64-Shipping.exe", "supermode_me.exe");
+
+	while (true)
+	{
+		std::cout << rwptm::read_virtual_memory<short>(rwptm::target_base) << std::endl;
+		Sleep(1);
+	}
+}
+
+int main(int argc, char* argv[])
+{
+	if (argc < 2)
+	{
+		std::cout << "Please start supermode.exe instead of this application\n";
+		system("pause");
+		return -1;
+	}
+	else if (strcmp(argv[1], "SUPERMODE") != 0)
+	{
+		std::cout << "Please start supermode.exe instead of this application\n";
+		system("pause");
+		return -1;
+	}
+
+	std::cout << "Starting...\n";
 
 	while (!supermode_comm::load())
 	{
@@ -10,21 +37,8 @@ int main()
 		Sleep(1000);
 	}
 
-	Sleep(5000);
-	system("pause");
-
-	uint64_t base = supermode::attach("explorer.exe");
-
-	std::cout << base << std::endl;
-	system("pause");
-
-	byte buf[3] = { 0 };
-
-	supermode_comm::read_physical_memory(0x1ad000, 2, (uint64_t*)buf);
-
-	//sm.read_physical_memory(0x1ad000, (uintptr_t)buf, 2);
-	std::cout << buf[0] << std::endl;
-
+	Sleep(1000);
+	startup();
 	system("pause");
 
 	return 1;

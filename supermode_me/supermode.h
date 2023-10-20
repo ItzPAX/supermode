@@ -73,5 +73,5 @@ namespace supermode {
 	}
 
 	uint64_t get_process_id(const char* image_name);
-	uintptr_t attach(const char* image_name);
+	uintptr_t attach(const char* image_name, uintptr_t* out_cr3);
 };

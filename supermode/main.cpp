@@ -3,7 +3,7 @@
 int main()
 {
 	remove("C:\\indices.json");
-	std::cout << "START ME FIRST!!!\n";
+	system("supermode_me.exe SUPERMODE");
 
 	while (!supermode::wnbios.get_process_base("supermode_me.exe"))
 	{
@@ -24,7 +24,7 @@ int main()
 
 	std::cout << "target is now supermoded lets pray the system doesnt BSOD :(\n";
 
-	system("pause");
+	Sleep(1000);
 
 	return 1;
 }

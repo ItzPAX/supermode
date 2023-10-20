@@ -136,7 +136,7 @@ uint64_t supermode::get_process_id(const char* image_name)
 	return 1;
 }
 
-uintptr_t supermode::attach(const char* image_name)
+uintptr_t supermode::attach(const char* image_name, uintptr_t* out_cr3)
 {
 	supermode_comm::load();
 
@@ -169,16 +169,22 @@ uintptr_t supermode::attach(const char* image_name)
 		std::cout << a << std::endl;
 
 		uintptr_t kprocess = flink - EP_ACTIVEPROCESSLINK;
-		uintptr_t virtual_size = read_virtual_memory<uintptr_t>(kprocess + EP_VIRTUALSIZE, supermode_comm::system_cr3);
+
+		byte kproc_buf[0x1000];
+		read_virtual_memory(kprocess, (uint64_t*)kproc_buf, 0x1000, supermode_comm::system_cr3);
+
+		uintptr_t virtual_size;
+		memcpy(&virtual_size, &kproc_buf[EP_VIRTUALSIZE], sizeof(uintptr_t));
 
 		if (virtual_size == 0)
 			continue;
 
-		char name[16] = { };
-		read_virtual_memory(kprocess + EP_IMAGEFILENAME, (uintptr_t*)&name, sizeof(name), supermode_comm::system_cr3);
-
 		int process_id = 0;
-		read_virtual_memory(kprocess + EP_UNIQUEPROCESSID, (uintptr_t*)&process_id, sizeof(process_id), supermode_comm::system_cr3);
+		memcpy(&process_id, &kproc_buf[EP_UNIQUEPROCESSID], sizeof(int));
+
+		char name[16] = { };
+		memcpy((uintptr_t*) & name, &kproc_buf[EP_IMAGEFILENAME], sizeof(name));
+		std::cout << name << std::endl;
 
 		if (strstr(image_name, name) && process_id == get_process_id(image_name))
 		{
@@ -192,6 +198,8 @@ uintptr_t supermode::attach(const char* image_name)
 			image_base_out = base_address;
 			attached_cr3 = directory_table;
 			attached_proc = process_id;
+
+			*out_cr3 = directory_table;
 
 			break;
 		}

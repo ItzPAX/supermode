@@ -2,6 +2,8 @@
 #include <Windows.h>
 #include <iostream>
 #include <fstream>
+#include <thread>
+#include <chrono>
 #include "json.hpp"
 
 namespace supermode_comm
@@ -105,33 +107,61 @@ namespace supermode_comm
 		return virtual_address;
 	}
 
-	static void change_mal_pt_pfn(uint64_t pfn)
+	static void invalidate_pte_tlb()
+	{
+		uint64_t mal_pte_va = generate_virtual_address(mal_pte_ind[PML4], mal_pte_ind[PDPT], mal_pte_ind[PD], mal_pte_ind[PT], 0);
+
+		while (true)
+		{
+			YieldProcessor();
+
+			__try
+			{
+				if (*(PCHAR)mal_pte_va)
+					continue;
+			}
+			__except (EXCEPTION_EXECUTE_HANDLER)
+			{
+				return;
+			}
+		}
+	}
+
+	static uintptr_t change_mal_pt_pfn(uint64_t pfn)
 	{
 		current_pfn = pfn;
 
+		uint64_t va = generate_virtual_address(mal_pointer_pte_ind[PML4], mal_pointer_pte_ind[PDPT], mal_pointer_pte_ind[PD], mal_pointer_pte_ind[PT], 0);
+
 		PTE mal_pte;
+		mal_pte.Value = 0;
+		memcpy((void*)va, &mal_pte, sizeof(PTE));
+		invalidate_pte_tlb();
+
 		mal_pte.Present = 1;
 		mal_pte.ReadWrite = 1;
 		mal_pte.UserSupervisor = 1;
 		mal_pte.PageFrameNumber = pfn;
 		mal_pte.ExecuteDisable = 1;
-		mal_pte.Dirty = 1;
-		mal_pte.Accessed = 1;
+		mal_pte.Dirty = 0;
+		mal_pte.Accessed = 0;
 		mal_pte.PageCacheDisable = 1;
 		mal_pte.PageWriteThrough = 1;
 
-		Sleep(1);
-
-		uint64_t va = generate_virtual_address(mal_pointer_pte_ind[PML4], mal_pointer_pte_ind[PDPT], mal_pointer_pte_ind[PD], mal_pointer_pte_ind[PT], 0);
 		memcpy((void*)va, &mal_pte, sizeof(PTE));
+
+		return va;
 	}
 
 	static void read_physical_memory(uint64_t addr, uint64_t size, uint64_t* buf)
 	{
 		PTE_PFN pfn = calc_pfnpte_from_addr(addr);
 
-		if (current_pfn != pfn.pfn)
+		if (pfn.pfn != current_pfn)
+		{
 			change_mal_pt_pfn(pfn.pfn);
+			MemoryFence();
+		}
 
 		uint64_t va = generate_virtual_address(mal_pte_ind[PML4], mal_pte_ind[PDPT], mal_pte_ind[PD], mal_pte_ind[PT], pfn.offset);
 		memcpy((void*)buf, (void*)va, size);
@@ -141,8 +171,11 @@ namespace supermode_comm
 	{
 		PTE_PFN pfn = calc_pfnpte_from_addr(addr);
 
-		if (current_pfn != pfn.pfn)
+		if (pfn.pfn != current_pfn)
+		{
 			change_mal_pt_pfn(pfn.pfn);
+			MemoryFence();
+		}
 
 		uint64_t va = generate_virtual_address(mal_pte_ind[PML4], mal_pte_ind[PDPT], mal_pte_ind[PD], mal_pte_ind[PT], pfn.offset);
 		memcpy((void*)va, (void*)data, size);
