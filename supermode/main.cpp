@@ -1,9 +1,16 @@
 #include "supermode.h"
 
+void start_thread()
+{
+	system("supermode_me.exe SUPERMODE");
+}
+
 int main()
 {
 	remove("C:\\indices.json");
-	system("supermode_me.exe SUPERMODE");
+	HANDLE h = CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)start_thread, NULL, NULL, NULL);
+	if (h)
+		CloseHandle(h);
 
 	while (!supermode::wnbios.get_process_base("supermode_me.exe"))
 	{
