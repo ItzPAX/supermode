@@ -283,7 +283,7 @@ bool supermode::read_virtual_memory(uintptr_t address, uint64_t* output, unsigne
 	if (!address)
 		return false;
 
-	if (!size)
+	if (!size || size > 0x1000)
 		return false;
 
 	uintptr_t physical_address = convert_virtual_to_physical(address, cr3);
@@ -318,17 +318,23 @@ uintptr_t supermode::convert_virtual_to_physical(uintptr_t virtual_address, uint
 	supermode_comm::read_physical_memory((cr3 + PML4 * sizeof(uintptr_t)), sizeof(PML4E), (uintptr_t*)&PML4E);
 
 	if (PML4E == 0)
+	{
 		return 0;
+	}
 
 	unsigned short DirectoryPtr = (unsigned short)((va >> 30) & 0x1FF);
 	uintptr_t PDPTE = 0;
 	supermode_comm::read_physical_memory(((PML4E & 0xFFFFFFFFFF000) + DirectoryPtr * sizeof(uintptr_t)), sizeof(PDPTE), (uintptr_t*)&PDPTE);
 
 	if (PDPTE == 0)
+	{
 		return 0;
+	}
 
 	if ((PDPTE & (1 << 7)) != 0)
+	{
 		return (PDPTE & 0xFFFFFC0000000) + (va & 0x3FFFFFFF);
+	}
 
 	unsigned short Directory = (unsigned short)((va >> 21) & 0x1FF);
 
@@ -336,7 +342,9 @@ uintptr_t supermode::convert_virtual_to_physical(uintptr_t virtual_address, uint
 	supermode_comm::read_physical_memory(((PDPTE & 0xFFFFFFFFFF000) + Directory * sizeof(uintptr_t)), sizeof(PDE), (uintptr_t*)&PDE);
 
 	if (PDE == 0)
+	{
 		return 0;
+	}
 
 	if ((PDE & (1 << 7)) != 0)
 	{
@@ -349,7 +357,9 @@ uintptr_t supermode::convert_virtual_to_physical(uintptr_t virtual_address, uint
 	supermode_comm::read_physical_memory(((PDE & 0xFFFFFFFFFF000) + Table * sizeof(uintptr_t)), sizeof(PTE), (uintptr_t*)&PTE);
 
 	if (PTE == 0)
+	{
 		return 0;
+	}
 
 	return (PTE & 0xFFFFFFFFFF000) + (va & 0xFFF);
 }

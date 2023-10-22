@@ -23,7 +23,7 @@ void startup()
 		auto ulevel = supermode::read_virtual_memory< uintptr_t >(uworld + offsets::ulevel, val_cr3);
 		printf("ulevel: 0x%p\n", ulevel);
 
-		Sleep(2000);
+		Sleep(1);
 	}
 	system("pause");
 }

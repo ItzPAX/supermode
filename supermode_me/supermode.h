@@ -11,6 +11,7 @@
 #include <random>
 #include <string>
 #include <direct.h>
+#include <unordered_map>
 
 #pragma comment( lib, "ntdll.lib" )
 
