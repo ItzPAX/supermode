@@ -6,8 +6,34 @@
 #include <chrono>
 #include "json.hpp"
 
+#define PFN_ENC_KEY 0x6942069
+
 namespace supermode_comm
 {
+	typedef struct _PML4E
+	{
+		union
+		{
+			struct
+			{
+				ULONG64 Present : 1;              // Must be 1, region invalid if 0.
+				ULONG64 ReadWrite : 1;            // If 0, writes not allowed.
+				ULONG64 UserSupervisor : 1;       // If 0, user-mode accesses not allowed.
+				ULONG64 PageWriteThrough : 1;     // Determines the memory type used to access PDPT.
+				ULONG64 PageCacheDisable : 1;     // Determines the memory type used to access PDPT.
+				ULONG64 Accessed : 1;             // If 0, this entry has not been used for translation.
+				ULONG64 Ignored1 : 1;
+				ULONG64 PageSize : 1;             // Must be 0 for PML4E.
+				ULONG64 Ignored2 : 4;
+				ULONG64 PageFrameNumber : 36;     // The page frame number of the PDPT of this PML4E.
+				ULONG64 Reserved : 4;
+				ULONG64 Ignored3 : 11;
+				ULONG64 ExecuteDisable : 1;       // If 1, instruction fetches not allowed.
+			};
+			ULONG64 Value;
+		};
+	} PML4E, * PPML4E;
+
 	typedef struct _PTE
 	{
 		union
@@ -44,6 +70,7 @@ namespace supermode_comm
 
 	static uint64_t mal_pointer_pte_ind[4];
 	static uint64_t mal_pte_ind[4];
+	static uint64_t mal_pml4_pte_ind[4];
 
 	static uint64_t system_cr3;
 
@@ -81,6 +108,12 @@ namespace supermode_comm
 			if (mal_pte_ind[i] == 0)
 				mal_pte_ind[i] = j["mal_pte_indices"][std::to_string(i)].get<uint64_t>();
 			std::cout << i << ":" << mal_pte_ind[i] << std::endl;
+		}
+		for (int i = 0; i <= PT; i++)
+		{
+			if (mal_pml4_pte_ind[i] == 0)
+				mal_pml4_pte_ind[i] = j["mal_pml4_pte_indices"][std::to_string(i)].get<uint64_t>();
+			std::cout << i << ":" << mal_pml4_pte_ind[i] << std::endl;
 		}
 
 		return true;
@@ -149,6 +182,28 @@ namespace supermode_comm
 		mal_pte.PageWriteThrough = 1;
 
 		memcpy((void*)va, &mal_pte, sizeof(PTE));
+
+		return va;
+	}
+
+	static uintptr_t encdec_pml4e(uint64_t pml4e)
+	{
+		uint64_t va = generate_virtual_address(mal_pml4_pte_ind[PML4], mal_pml4_pte_ind[PDPT], mal_pml4_pte_ind[PD], mal_pml4_pte_ind[PT], pml4e * sizeof(PPML4E));
+
+		PML4E pml4;
+		memcpy(&pml4, (void*)va, sizeof(PML4E));
+
+		std::cout << pml4e << std::endl;
+
+		std::cout << "old pfn: " << std::hex << pml4.PageFrameNumber << std::dec << std::endl;
+		system("pause");
+		pml4.PageFrameNumber ^= PFN_ENC_KEY;
+		std::cout << "new pfn: " << std::hex << pml4.PageFrameNumber << std::dec << std::endl;
+		system("pause");
+
+		memcpy((void*)va, &pml4, sizeof(PML4E));
+		std::cout << "written!" << std::endl;
+		system("pause");
 
 		return va;
 	}

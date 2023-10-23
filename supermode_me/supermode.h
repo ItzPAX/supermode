@@ -60,13 +60,11 @@ namespace supermode {
 	static uintptr_t convert_virtual_to_physical(uintptr_t virtual_address, uint64_t cr3 = USE_PROCESS_CR3);
 
 	template<typename T>
-	T read_virtual_memory(uintptr_t address, uint64_t cr3 = USE_PROCESS_CR3)
+	T read_virtual_memory(uintptr_t address, bool* success, uint64_t cr3 = USE_PROCESS_CR3)
 	{
 		T buffer;
 
-		if (!read_virtual_memory(address, (uintptr_t*) & buffer, sizeof(T), cr3))
-			return NULL;
-
+		*success = read_virtual_memory(address, (uintptr_t*)&buffer, sizeof(T), cr3);
 		return buffer;
 	}
 

@@ -1,4 +1,4 @@
-#include "val_shit/utils.h"
+#include "rwptm.h"
 
 uintptr_t val_cr3 = 0;
 void startup()
@@ -6,25 +6,12 @@ void startup()
 	std::cout << "start the game now!\n";
 	system("pause");
 
-	//rwptm::init("VALORANT-Win64-Shipping.exe", "supermode_me.exe");
-
-	supermode::attach("VALORANT-Win64-Shipping.exe", &val_cr3);
-
-	auto guardedregion = utils::retrieve_guarded();
-	printf("guardedregion: 0x%p\n", guardedregion);
+	rwptm::init("explorer.exe", "supermode_me.exe");
 
 	Sleep(1000);
 
-	while (true)
-	{
-		auto uworld = utils::getuworld(guardedregion);
-		printf("uworld: 0x%p\n", uworld);
+	std::cout << rwptm::read_virtual_memory<short>(rwptm::target_base) << std::endl;
 
-		auto ulevel = supermode::read_virtual_memory< uintptr_t >(uworld + offsets::ulevel, val_cr3);
-		printf("ulevel: 0x%p\n", ulevel);
-
-		Sleep(1);
-	}
 	system("pause");
 }
 

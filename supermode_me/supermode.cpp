@@ -188,8 +188,9 @@ uintptr_t supermode::attach(const char* image_name, uintptr_t* out_cr3)
 
 		if (strstr(image_name, name) && process_id == get_process_id(image_name))
 		{
-			uintptr_t directory_table = read_virtual_memory<uintptr_t>(kprocess + EP_DIRECTORYTABLE, supermode_comm::system_cr3);
-			uintptr_t base_address = read_virtual_memory<uintptr_t>(kprocess + EP_SECTIONBASE, supermode_comm::system_cr3);
+			bool success = true;
+			uintptr_t directory_table = read_virtual_memory<uintptr_t>(kprocess + EP_DIRECTORYTABLE, &success, supermode_comm::system_cr3);
+			uintptr_t base_address = read_virtual_memory<uintptr_t>(kprocess + EP_SECTIONBASE, &success, supermode_comm::system_cr3);
 
 			printf("process_id: %i\n", process_id);
 			printf("process_base: %llx\n", base_address);
@@ -313,8 +314,8 @@ uintptr_t supermode::convert_virtual_to_physical(uintptr_t virtual_address, uint
 
 	uintptr_t va = virtual_address;
 
-	if (tlb[va] != 0)
-		return tlb[va];
+	//if (tlb[va] != 0)
+	//	return tlb[va];
 
 	unsigned short PML4 = (unsigned short)((va >> 39) & 0x1FF);
 	uintptr_t PML4E = 0;

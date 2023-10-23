@@ -137,8 +137,6 @@
     <ClInclude Include="supermode.h" />
     <ClInclude Include="json.hpp" />
     <ClInclude Include="supermode_comm.h" />
-    <ClInclude Include="val_shit\offsets.h" />
-    <ClInclude Include="val_shit\utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

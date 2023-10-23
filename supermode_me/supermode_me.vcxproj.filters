@@ -13,9 +13,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="val_shit">
-      <UniqueIdentifier>{61db31d2-dfba-4b08-9a1e-1a6877c713b9}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -37,12 +34,6 @@
     </ClInclude>
     <ClInclude Include="rwptm.h">
       <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="val_shit\offsets.h">
-      <Filter>val_shit</Filter>
-    </ClInclude>
-    <ClInclude Include="val_shit\utils.h">
-      <Filter>val_shit</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

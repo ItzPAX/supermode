@@ -32,6 +32,7 @@ namespace rwptm
 
 	std::unordered_map<int, PML4E> cached_pml4;
 	std::unordered_map<int, int> translation_table;
+	std::unordered_map<int, bool> encrypted_pml4es;
 
 	// populates internal pml4 cache you should call this when attached to the target pocess
 	void populate_cached_pml4(uintptr_t cr3)
@@ -59,7 +60,7 @@ namespace rwptm
 		std::cout << "Stored " << cached_pml4.size() << " PML4 entries\n";
 	}
 
-	// copy all present pml4e into local pml4 and setup translation table
+	// encrypt pml4e pfn, copy all present pml4e into local pml4 and setup translation table
 	void setup_pml4_table(uintptr_t cr3)
 	{
 		std::cout << "Copying PML4 of target process to local pml4\n";
@@ -82,6 +83,11 @@ namespace rwptm
 				// page is free for our use
 				if (!pml4e_attacker.Present)
 				{
+					std::cout << i << ": changing pml4e pfn from " << pml4e_target.PageFrameNumber;
+					pml4e_target.PageFrameNumber ^= PFN_ENC_KEY;
+					encrypted_pml4es[i] = true;
+					std::cout << " to " << pml4e_target.PageFrameNumber << std::endl;
+
 					supermode_comm::write_physical_memory(cr3 + i * sizeof(uintptr_t), sizeof(PML4E), (uint64_t*) & pml4e_target);
 					translation_table[pml4e_map.first] = i;
 					break;
@@ -106,6 +112,18 @@ namespace rwptm
 		return newAddress;
 	}
 
+	void encdec_pml4e_pfn(uintptr_t virtual_address)
+	{
+		const uint64_t originalAddress = virtual_address;
+		unsigned short originalPML4 = (unsigned short)((originalAddress >> 39) & 0x1FF);
+
+		if (encrypted_pml4es[originalPML4] != false)
+		{
+			std::cout << "decrypting for pml4e " << originalPML4 << std::endl;
+			system("pause");
+			supermode_comm::encdec_pml4e(originalPML4);
+		}
+	}
 
 	// -------- USER FUNCS ---------
 	uintptr_t target_base = 0;
@@ -116,7 +134,6 @@ namespace rwptm
 		target_base = supermode::attach(target_application, &target_cr3);
 		if (!target_base)
 			return false;
-
 		rwptm::populate_cached_pml4(target_cr3);
 
 		uintptr_t attacker_cr3;
@@ -131,7 +148,9 @@ namespace rwptm
 	{
 		T out;
 		uintptr_t fixed_addr = correct_virtual_address(address);
+		encdec_pml4e_pfn(fixed_addr);
 		memcpy(&out, (void*)fixed_addr, sizeof(T));
+		encdec_pml4e_pfn(fixed_addr);
 		return out;
 	}
 
@@ -139,6 +158,8 @@ namespace rwptm
 	void write_virtual_memory(uintptr_t address, T val)
 	{
 		uintptr_t fixed_addr = correct_virtual_address(address);
-		memcpy((void*)fixed_addr, (void*)&val, sizeof(T));
+		encdec_pml4e_pfn(fixed_addr);
+		memcpy((void*)fixed_addr, (void*)&val, sizeof(T));		
+		encdec_pml4e_pfn(fixed_addr);
 	}
 }
