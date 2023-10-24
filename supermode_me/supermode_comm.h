@@ -34,6 +34,54 @@ namespace supermode_comm
 		};
 	} PML4E, * PPML4E;
 
+	typedef struct _PDPTE
+	{
+		union
+		{
+			struct
+			{
+				ULONG64 Present : 1;              // Must be 1, region invalid if 0.
+				ULONG64 ReadWrite : 1;            // If 0, writes not allowed.
+				ULONG64 UserSupervisor : 1;       // If 0, user-mode accesses not allowed.
+				ULONG64 PageWriteThrough : 1;     // Determines the memory type used to access PD.
+				ULONG64 PageCacheDisable : 1;     // Determines the memory type used to access PD.
+				ULONG64 Accessed : 1;             // If 0, this entry has not been used for translation.
+				ULONG64 Ignored1 : 1;
+				ULONG64 PageSize : 1;             // If 1, this entry maps a 1GB page.
+				ULONG64 Ignored2 : 4;
+				ULONG64 PageFrameNumber : 36;     // The page frame number of the PD of this PDPTE.
+				ULONG64 Reserved : 4;
+				ULONG64 Ignored3 : 11;
+				ULONG64 ExecuteDisable : 1;       // If 1, instruction fetches not allowed.
+			};
+			ULONG64 Value;
+		};
+	} PDPTE, * PPDPTE;
+
+	typedef struct _PDE
+	{
+		union
+		{
+			struct
+			{
+				ULONG64 Present : 1;              // Must be 1, region invalid if 0.
+				ULONG64 ReadWrite : 1;            // If 0, writes not allowed.
+				ULONG64 UserSupervisor : 1;       // If 0, user-mode accesses not allowed.
+				ULONG64 PageWriteThrough : 1;     // Determines the memory type used to access PT.
+				ULONG64 PageCacheDisable : 1;     // Determines the memory type used to access PT.
+				ULONG64 Accessed : 1;             // If 0, this entry has not been used for translation.
+				ULONG64 Ignored1 : 1;
+				ULONG64 PageSize : 1;             // If 1, this entry maps a 2MB page.
+				ULONG64 Ignored2 : 4;
+				ULONG64 PageFrameNumber : 36;     // The page frame number of the PT of this PDE.
+				ULONG64 Reserved : 4;
+				ULONG64 Ignored3 : 11;
+				ULONG64 ExecuteDisable : 1;       // If 1, instruction fetches not allowed.
+			};
+			ULONG64 Value;
+		};
+	} PDE, * PPDE;
+
 	typedef struct _PTE
 	{
 		union
@@ -169,19 +217,24 @@ namespace supermode_comm
 		PTE mal_pte;
 		mal_pte.Value = 0;
 		memcpy((void*)va, &mal_pte, sizeof(PTE));
+
+		MemoryFence();
+
 		invalidate_pte_tlb();
 
 		mal_pte.Present = 1;
-		mal_pte.ReadWrite = 1;
 		mal_pte.UserSupervisor = 1;
-		mal_pte.PageFrameNumber = pfn;
-		mal_pte.ExecuteDisable = 1;
-		mal_pte.Dirty = 0;
-		mal_pte.Accessed = 0;
 		mal_pte.PageCacheDisable = 1;
 		mal_pte.PageWriteThrough = 1;
+		mal_pte.ReadWrite = 1;
+		mal_pte.ExecuteDisable = 1;
+		mal_pte.Accessed = 1;
+		mal_pte.Dirty = 1;
+		mal_pte.PageFrameNumber = pfn;
 
 		memcpy((void*)va, &mal_pte, sizeof(PTE));
+
+		MemoryFence();
 
 		return va;
 	}
@@ -192,34 +245,33 @@ namespace supermode_comm
 
 		PML4E pml4;
 		memcpy(&pml4, (void*)va, sizeof(PML4E));
-
-		std::cout << pml4e << std::endl;
-
-		std::cout << "old pfn: " << std::hex << pml4.PageFrameNumber << std::dec << std::endl;
-		system("pause");
 		pml4.PageFrameNumber ^= PFN_ENC_KEY;
-		std::cout << "new pfn: " << std::hex << pml4.PageFrameNumber << std::dec << std::endl;
-		system("pause");
-
 		memcpy((void*)va, &pml4, sizeof(PML4E));
-		std::cout << "written!" << std::endl;
-		system("pause");
 
 		return va;
 	}
 
-	static void read_physical_memory(uint64_t addr, uint64_t size, uint64_t* buf)
+	static bool read_physical_memory(uint64_t addr, uint64_t size, uint64_t* buf)
 	{
 		PTE_PFN pfn = calc_pfnpte_from_addr(addr);
 
+		if (pfn.pfn > 0x1000000000)
+			return false;
+
 		if (pfn.pfn != current_pfn)
-		{
 			change_mal_pt_pfn(pfn.pfn);
-			MemoryFence();
-		}
+
+		MemoryFence();
 
 		uint64_t va = generate_virtual_address(mal_pte_ind[PML4], mal_pte_ind[PDPT], mal_pte_ind[PD], mal_pte_ind[PT], pfn.offset);
-		memcpy((void*)buf, (void*)va, size);
+
+		if (!IsBadReadPtr((void*)va, size))
+		{
+			memcpy((void*)buf, (void*)va, size);
+			return true;
+		}
+
+		return false;
 	}
 
 	static void write_physical_memory(uint64_t addr, uint64_t size, uint64_t* data)

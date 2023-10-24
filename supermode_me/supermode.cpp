@@ -136,24 +136,67 @@ uint64_t supermode::get_process_id(const char* image_name)
 	return 1;
 }
 
-uintptr_t supermode::attach(const char* image_name, uintptr_t* out_cr3)
+uintptr_t supermode::get_process_base_um(uint64_t pid, const char* name)
+{
+	uintptr_t modBaseAddr = 0;
+	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid);
+	if (hSnap != INVALID_HANDLE_VALUE)
+	{
+		MODULEENTRY32 modEntry;
+		modEntry.dwSize = sizeof(modEntry);
+		if (Module32First(hSnap, &modEntry))
+		{
+			do
+			{
+				if (!_stricmp(modEntry.szModule, name))
+				{
+					modBaseAddr = (uintptr_t)modEntry.modBaseAddr;
+					break;
+				}
+			} while (Module32Next(hSnap, &modEntry));
+		}
+	}
+	CloseHandle(hSnap);
+	return modBaseAddr;
+}
+
+uintptr_t supermode::get_dtb_from_kprocess(uintptr_t kprocess)
+{
+	byte kproc_buf[0x1000];
+	read_virtual_memory(kprocess, (uint64_t*)kproc_buf, 0x1000, supermode_comm::system_cr3);
+
+	uintptr_t virtual_size;
+	memcpy(&virtual_size, &kproc_buf[EP_VIRTUALSIZE], sizeof(uintptr_t));
+
+	if (virtual_size == 0)
+		return 0;
+
+	bool success = true;
+	uintptr_t directory_table;
+	memcpy(&directory_table, &kproc_buf[EP_DIRECTORYTABLE], sizeof(uintptr_t));
+
+	return directory_table;
+}
+
+uintptr_t supermode::attach(const char* image_name, uintptr_t* out_cr3, uintptr_t* out_kprocess)
 {
 	supermode_comm::load();
 
 	get_eprocess_offsets();
-	std::cout << "obtained offsets!\n";
 
 	if (!supermode_comm::system_cr3)
 	{
 		std::cout << "system cr3 NOT set: " << std::hex << supermode_comm::system_cr3 << std::endl;
 		return NULL;
 	}
-	std::cout << "system cr3 set!\n";
 
 	uintptr_t kprocess_initial = leak_kprocess();
 
 	if (!kprocess_initial)
+	{
+		std::cout << "couldnt find kprocess\n";
 		return NULL;
+	}
 
 	printf("system_kprocess: %llx\n", kprocess_initial);
 
@@ -166,7 +209,6 @@ uintptr_t supermode::attach(const char* image_name, uintptr_t* out_cr3)
 	for (int a = 0; a < limit; a++)
 	{
 		read_virtual_memory(flink, (uintptr_t*)&flink, sizeof(PVOID), supermode_comm::system_cr3);
-		std::cout << a << std::endl;
 
 		uintptr_t kprocess = flink - EP_ACTIVEPROCESSLINK;
 
@@ -184,13 +226,15 @@ uintptr_t supermode::attach(const char* image_name, uintptr_t* out_cr3)
 
 		char name[16] = { };
 		memcpy((uintptr_t*) & name, &kproc_buf[EP_IMAGEFILENAME], sizeof(name));
-		std::cout << name << std::endl;
 
 		if (strstr(image_name, name) && process_id == get_process_id(image_name))
 		{
 			bool success = true;
-			uintptr_t directory_table = read_virtual_memory<uintptr_t>(kprocess + EP_DIRECTORYTABLE, &success, supermode_comm::system_cr3);
-			uintptr_t base_address = read_virtual_memory<uintptr_t>(kprocess + EP_SECTIONBASE, &success, supermode_comm::system_cr3);
+			uintptr_t directory_table;
+			memcpy(&directory_table, &kproc_buf[EP_DIRECTORYTABLE], sizeof(uintptr_t));
+
+			uintptr_t base_address;
+			memcpy(&base_address, &kproc_buf[EP_SECTIONBASE], sizeof(uintptr_t));
 
 			printf("process_id: %i\n", process_id);
 			printf("process_base: %llx\n", base_address);
@@ -200,6 +244,7 @@ uintptr_t supermode::attach(const char* image_name, uintptr_t* out_cr3)
 			attached_cr3 = directory_table;
 			attached_proc = process_id;
 
+			*out_kprocess = kprocess;
 			*out_cr3 = directory_table;
 
 			break;
@@ -314,59 +359,68 @@ uintptr_t supermode::convert_virtual_to_physical(uintptr_t virtual_address, uint
 
 	uintptr_t va = virtual_address;
 
-	//if (tlb[va] != 0)
-	//	return tlb[va];
+	if (tlb[va + cr3] != 0)
+		return tlb[va + cr3];
 
 	unsigned short PML4 = (unsigned short)((va >> 39) & 0x1FF);
-	uintptr_t PML4E = 0;
-	supermode_comm::read_physical_memory((cr3 + PML4 * sizeof(uintptr_t)), sizeof(PML4E), (uintptr_t*)&PML4E);
+	supermode_comm::PML4E PML4E;
 
-	if (PML4E == 0)
+	if (!supermode_comm::read_physical_memory((cr3 + PML4 * sizeof(uintptr_t)), sizeof(PML4E), (uintptr_t*)&PML4E))
+		return 0;
+
+	if (PML4E.Present == 0 || PML4E.Reserved != 0)
 	{
 		return 0;
 	}
 
 	unsigned short DirectoryPtr = (unsigned short)((va >> 30) & 0x1FF);
-	uintptr_t PDPTE = 0;
-	supermode_comm::read_physical_memory(((PML4E & 0xFFFFFFFFFF000) + DirectoryPtr * sizeof(uintptr_t)), sizeof(PDPTE), (uintptr_t*)&PDPTE);
 
-	if (PDPTE == 0)
+	supermode_comm::PDPTE PDPTE;
+	
+	if (!supermode_comm::read_physical_memory(((PML4E.Value & 0xFFFFFFFFFF000) + DirectoryPtr * sizeof(uintptr_t)), sizeof(PDPTE), (uintptr_t*)&PDPTE))
+		return 0;
+
+	if (PDPTE.Present == 0 || PDPTE.Reserved != 0)
 	{
 		return 0;
 	}
 
-	if ((PDPTE & (1 << 7)) != 0)
+	if (PDPTE.PageSize != 0)
 	{
-		tlb[va] = (PDPTE & 0xFFFFFC0000000) + (va & 0x3FFFFFFF);
-		return (PDPTE & 0xFFFFFC0000000) + (va & 0x3FFFFFFF);
+		tlb[va + cr3] = (PDPTE.Value & 0xFFFFFC0000000) + (va & 0x3FFFFFFF);
+		return (PDPTE.Value & 0xFFFFFC0000000) + (va & 0x3FFFFFFF);
 	}
 
 	unsigned short Directory = (unsigned short)((va >> 21) & 0x1FF);
 
-	uintptr_t PDE = 0;
-	supermode_comm::read_physical_memory(((PDPTE & 0xFFFFFFFFFF000) + Directory * sizeof(uintptr_t)), sizeof(PDE), (uintptr_t*)&PDE);
+	supermode_comm::PDE PDE;
 
-	if (PDE == 0)
+	if (!supermode_comm::read_physical_memory(((PDPTE.Value & 0xFFFFFFFFFF000) + Directory * sizeof(uintptr_t)), sizeof(PDE), (uintptr_t*)&PDE))
+		return 0;
+
+	if (PDE.Present == 0 || PDE.Reserved != 0)
 	{
 		return 0;
 	}
 
-	if ((PDE & (1 << 7)) != 0)
+	if (PDE.PageSize != 0)
 	{
-		tlb[va] = (PDE & 0xFFFFFFFE00000) + (va & 0x1FFFFF);
-		return (PDE & 0xFFFFFFFE00000) + (va & 0x1FFFFF);
+		tlb[va + cr3] = (PDE.Value & 0xFFFFFFFE00000) + (va & 0x1FFFFF);
+		return (PDE.Value & 0xFFFFFFFE00000) + (va & 0x1FFFFF);
 	}
 
 	unsigned short Table = (unsigned short)((va >> 12) & 0x1FF);
-	uintptr_t PTE = 0;
 
-	supermode_comm::read_physical_memory(((PDE & 0xFFFFFFFFFF000) + Table * sizeof(uintptr_t)), sizeof(PTE), (uintptr_t*)&PTE);
+	supermode_comm::PTE PTE;
 
-	if (PTE == 0)
+	if (!supermode_comm::read_physical_memory(((PDE.Value & 0xFFFFFFFFFF000) + Table * sizeof(uintptr_t)), sizeof(PTE), (uintptr_t*)&PTE))
+		return 0;
+
+	if (PTE.Present == 0 || PTE.Reserved != 0)
 	{
 		return 0;
 	}
 
-	tlb[va] = (PTE & 0xFFFFFFFFFF000) + (va & 0xFFF);
-	return (PTE & 0xFFFFFFFFFF000) + (va & 0xFFF);
+	tlb[va + cr3] = (PTE.Value & 0xFFFFFFFFFF000) + (va & 0xFFF);
+	return (PTE.Value & 0xFFFFFFFFFF000) + (va & 0xFFF);
 }

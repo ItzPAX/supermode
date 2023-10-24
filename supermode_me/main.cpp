@@ -1,20 +1,5 @@
 #include "rwptm.h"
 
-uintptr_t val_cr3 = 0;
-void startup()
-{
-	std::cout << "start the game now!\n";
-	system("pause");
-
-	rwptm::init("explorer.exe", "supermode_me.exe");
-
-	Sleep(1000);
-
-	std::cout << rwptm::read_virtual_memory<short>(rwptm::target_base) << std::endl;
-
-	system("pause");
-}
-
 int main(int argc, char* argv[])
 {
 	if (argc < 2)
@@ -37,10 +22,19 @@ int main(int argc, char* argv[])
 		std::cout << "retrying to load...\n";
 		Sleep(1000);
 	}
-
-	Sleep(1000);
-	startup();
+	
+	std::cout << "Open the game...\n";
 	system("pause");
+
+	uintptr_t supermode_dtb, supermode_kproc;
+	supermode::attach("TotallyAccurateBattlegrounds.exe", &supermode_dtb, &supermode_kproc);
+
+	while (true)
+	{
+		std::cout << "Found DTB: " << std::hex << supermode::get_dtb_from_kprocess(supermode_kproc) << std::endl;
+
+		Sleep(1000);
+	}
 
 	return 1;
 }

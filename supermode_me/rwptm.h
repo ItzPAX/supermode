@@ -119,8 +119,6 @@ namespace rwptm
 
 		if (encrypted_pml4es[originalPML4] != false)
 		{
-			std::cout << "decrypting for pml4e " << originalPML4 << std::endl;
-			system("pause");
 			supermode_comm::encdec_pml4e(originalPML4);
 		}
 	}
@@ -130,14 +128,14 @@ namespace rwptm
 
 	bool init(const char* target_application, const char* local_application)
 	{
-		uintptr_t target_cr3;
-		target_base = supermode::attach(target_application, &target_cr3);
+		uintptr_t target_cr3, tmp1;
+		target_base = supermode::attach(target_application, &target_cr3, &tmp1);
 		if (!target_base)
 			return false;
 		rwptm::populate_cached_pml4(target_cr3);
 
 		uintptr_t attacker_cr3;
-		uintptr_t attacker_base = supermode::attach(local_application, &attacker_cr3);
+		uintptr_t attacker_base = supermode::attach(local_application, &attacker_cr3, &tmp1);
 		rwptm::setup_pml4_table(attacker_cr3);
 
 		return true;
@@ -149,8 +147,14 @@ namespace rwptm
 		T out;
 		uintptr_t fixed_addr = correct_virtual_address(address);
 		encdec_pml4e_pfn(fixed_addr);
+
+		MemoryFence();
+
 		memcpy(&out, (void*)fixed_addr, sizeof(T));
 		encdec_pml4e_pfn(fixed_addr);
+
+		MemoryFence();
+
 		return out;
 	}
 
@@ -159,7 +163,14 @@ namespace rwptm
 	{
 		uintptr_t fixed_addr = correct_virtual_address(address);
 		encdec_pml4e_pfn(fixed_addr);
+
+		MemoryFence();
+
 		memcpy((void*)fixed_addr, (void*)&val, sizeof(T));		
 		encdec_pml4e_pfn(fixed_addr);
+
+		MemoryFence();
+
+		return;
 	}
 }
