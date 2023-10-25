@@ -4,6 +4,7 @@
 #include <fstream>
 #include <thread>
 #include <chrono>
+#include <thread>
 #include "json.hpp"
 
 #define PFN_ENC_KEY 0x6942069
@@ -96,13 +97,13 @@ namespace supermode_comm
 				ULONG64 Accessed : 1;             // If 0, this entry has not been used for translation.
 				ULONG64 Dirty : 1;                // If 0, the memory backing this page has not been written to.
 				ULONG64 PageAccessType : 1;       // Determines the memory type used to access the memory.
-				ULONG64 Global : 1;                // If 1 and the PGE bit of CR4 is set, translations are global.
+				ULONG64 Global : 1;               // If 1 and the PGE bit of CR4 is set, translations are global.
 				ULONG64 Ignored2 : 3;
 				ULONG64 PageFrameNumber : 36;     // The page frame number of the backing physical page.
 				ULONG64 Reserved : 4;
 				ULONG64 Ignored3 : 7;
 				ULONG64 ProtectionKey : 4;         // If the PKE bit of CR4 is set, determines the protection key.
-				ULONG64 ExecuteDisable : 1;       // If 1, instruction fetches not allowed.
+				ULONG64 ExecuteDisable : 1;        // If 1, instruction fetches not allowed.
 			};
 			ULONG64 Value;
 		};
@@ -194,8 +195,6 @@ namespace supermode_comm
 
 		while (true)
 		{
-			YieldProcessor();
-
 			__try
 			{
 				if (*(PCHAR)mal_pte_va)
@@ -205,6 +204,8 @@ namespace supermode_comm
 			{
 				return;
 			}
+
+			YieldProcessor();
 		}
 	}
 
@@ -218,24 +219,18 @@ namespace supermode_comm
 		mal_pte.Value = 0;
 		memcpy((void*)va, &mal_pte, sizeof(PTE));
 
-		MemoryFence();
-
 		invalidate_pte_tlb();
-
+		 
+		mal_pte.PageFrameNumber = pfn;
 		mal_pte.Present = 1;
 		mal_pte.UserSupervisor = 1;
 		mal_pte.PageCacheDisable = 1;
-		mal_pte.PageWriteThrough = 1;
 		mal_pte.ReadWrite = 1;
 		mal_pte.ExecuteDisable = 1;
 		mal_pte.Accessed = 1;
 		mal_pte.Dirty = 1;
-		mal_pte.PageFrameNumber = pfn;
 
 		memcpy((void*)va, &mal_pte, sizeof(PTE));
-
-		MemoryFence();
-
 		return va;
 	}
 
@@ -255,7 +250,7 @@ namespace supermode_comm
 	{
 		PTE_PFN pfn = calc_pfnpte_from_addr(addr);
 
-		if (pfn.pfn > 0x1000000000)
+		if (pfn.pfn > 0x7FFFFF)
 			return false;
 
 		if (pfn.pfn != current_pfn)
@@ -265,13 +260,8 @@ namespace supermode_comm
 
 		uint64_t va = generate_virtual_address(mal_pte_ind[PML4], mal_pte_ind[PDPT], mal_pte_ind[PD], mal_pte_ind[PT], pfn.offset);
 
-		if (!IsBadReadPtr((void*)va, size))
-		{
-			memcpy((void*)buf, (void*)va, size);
-			return true;
-		}
-
-		return false;
+		memcpy((void*)buf, (void*)va, size);
+		return true;
 	}
 
 	static void write_physical_memory(uint64_t addr, uint64_t size, uint64_t* data)

@@ -160,6 +160,44 @@ uintptr_t supermode::get_process_base_um(uint64_t pid, const char* name)
 	return modBaseAddr;
 }
 
+uintptr_t supermode::get_dtb_from_process_base(uintptr_t base, uintptr_t valid_dtb)
+{
+	auto ntdll_address = (uintptr_t)GetModuleHandleA("ntdll.dll");
+	if (!ntdll_address) {
+		return false;
+	}
+
+	auto nt_dll_physical = supermode::convert_virtual_to_physical(ntdll_address, valid_dtb);
+
+	for (std::uintptr_t i = 3000; i != 0x50000000; i++)
+	{
+		std::uintptr_t dtb = i << 12;
+
+		if (dtb == valid_dtb)
+			continue;
+
+		std::cout << "Checking DTB " << std::hex << dtb << std::dec << "..." << std::endl;
+
+		auto phys_address = supermode::convert_virtual_to_physical(ntdll_address, dtb);
+
+		if (!phys_address)
+			continue;
+
+		if (phys_address == nt_dll_physical)
+		{
+			std::cout << "Valid DTB " << std::hex << dtb << std::dec << "!!!!!!!" << std::endl;
+			bool succ;
+			const auto bytes = supermode::read_virtual_memory<short>(base, &succ, dtb);
+			if (succ && bytes == 0x5A4D)
+			{
+				return dtb;
+			}
+		}
+	}
+
+	return 0;
+}
+
 uintptr_t supermode::get_dtb_from_kprocess(uintptr_t kprocess)
 {
 	byte kproc_buf[0x1000];
