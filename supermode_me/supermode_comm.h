@@ -122,6 +122,7 @@ namespace supermode_comm
 	static uint64_t mal_pml4_pte_ind[4];
 
 	static uint64_t system_cr3;
+	static uint64_t target_cr3;
 
 	static uint64_t current_pfn = 0;
 
@@ -145,7 +146,10 @@ namespace supermode_comm
 		nlohmann::json j = nlohmann::json::parse(content);
 
 		system_cr3 = j["cr3"].get<uint64_t>();
-		std::cout << "CR3: 0x" << std::hex << system_cr3 << std::dec << std::endl;
+		std::cout << "system_cr3: 0x" << std::hex << system_cr3 << std::dec << std::endl;
+
+		target_cr3 = j["target_cr3"].get<uint64_t>();
+		std::cout << "target_cr3: 0x" << std::hex << target_cr3 << std::dec << std::endl;
 
 		for (int i = 0; i <= PT; i++)
 		{

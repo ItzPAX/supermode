@@ -132,7 +132,29 @@ namespace rwptm
 		target_base = supermode::attach(target_application, &target_cr3, &tmp1);
 		if (!target_base)
 			return false;
+		std::cout << "Target base: " << std::hex << target_base << std::endl;
 		rwptm::populate_cached_pml4(target_cr3);
+
+		uintptr_t attacker_cr3;
+		uintptr_t attacker_base = supermode::attach(local_application, &attacker_cr3, &tmp1);
+		rwptm::setup_pml4_table(attacker_cr3);
+
+		return true;
+	}
+
+	// use stored cr3
+	bool init_stored_cr3(const char* target_application, const char* local_application)
+	{
+		supermode_comm::load();
+
+		uintptr_t tmp1;
+		DWORD target_pid = supermode::get_process_id(target_application);
+		target_base = supermode::get_process_base_um(target_pid, target_application);
+		std::cout << "Target base: " << std::hex << target_base << std::endl;
+		if (!target_base)
+			return false;
+		std::cout << "populating using cr3: " << supermode_comm::target_cr3 << std::endl;
+		rwptm::populate_cached_pml4(supermode_comm::target_cr3);
 
 		uintptr_t attacker_cr3;
 		uintptr_t attacker_base = supermode::attach(local_application, &attacker_cr3, &tmp1);

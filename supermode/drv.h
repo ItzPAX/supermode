@@ -1566,31 +1566,34 @@ public:
 
 	uintptr_t get_process_id(const char* image_name);
 	uintptr_t get_process_base(const char* image_name);
+	uintptr_t get_process_base_um(uint64_t pid, const char* name);
 
 	uintptr_t get_ntoskrnl_base();
 	uintptr_t find_pattern_at_kernel(uintptr_t base, byte* pattern, const char* mask);
+	uintptr_t find_dtb_from_base(uintptr_t base);
 
 	uintptr_t get_system_dirbase();
 	uintptr_t leak_kprocess();
 	bool leak_kpointers(std::vector<uintptr_t>& pointers);
 
+	uint32_t find_self_referencing_pml4e();
 
 	uintptr_t map_physical(uint64_t address, size_t size, wnbios_mem& mem);
 	uintptr_t unmap_physical(wnbios_mem& mem);
 
 	bool read_physical_memory(uintptr_t physical_address, void* out, unsigned long size);
 	bool write_physical_memory(uintptr_t physical_address, void* data, unsigned long size);
-	bool read_virtual_memory(uintptr_t address, LPVOID output, unsigned long size);
+	bool read_virtual_memory(uintptr_t address, LPVOID output, unsigned long size, uintptr_t dtb = -1);
 	bool write_virtual_memory(uintptr_t address, LPVOID data, unsigned long size);
 
-	uintptr_t convert_virtual_to_physical(uintptr_t virtual_address);
+	uintptr_t convert_virtual_to_physical(uintptr_t virtual_address, uintptr_t dtb = -1);
 
 	template<typename T>
-	T read_virtual_memory(uintptr_t address)
+	T read_virtual_memory(uintptr_t address, uintptr_t dtb = -1)
 	{
 		T buffer;
 
-		if (!read_virtual_memory(address, &buffer, sizeof(T)))
+		if (!read_virtual_memory(address, &buffer, sizeof(T), dtb))
 			return NULL;
 
 		return buffer;

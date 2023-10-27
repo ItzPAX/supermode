@@ -1,5 +1,29 @@
 #include "drv.h"
 
+typedef struct _PML4E
+{
+	union
+	{
+		struct
+		{
+			ULONG64 Present : 1;              // Must be 1, region invalid if 0.
+			ULONG64 ReadWrite : 1;            // If 0, writes not allowed.
+			ULONG64 UserSupervisor : 1;       // If 0, user-mode accesses not allowed.
+			ULONG64 PageWriteThrough : 1;     // Determines the memory type used to access PDPT.
+			ULONG64 PageCacheDisable : 1;     // Determines the memory type used to access PDPT.
+			ULONG64 Accessed : 1;             // If 0, this entry has not been used for translation.
+			ULONG64 Ignored1 : 1;
+			ULONG64 PageSize : 1;             // Must be 0 for PML4E.
+			ULONG64 Ignored2 : 4;
+			ULONG64 PageFrameNumber : 36;     // The page frame number of the PDPT of this PML4E.
+			ULONG64 Reserved : 4;
+			ULONG64 Ignored3 : 11;
+			ULONG64 ExecuteDisable : 1;       // If 1, instruction fetches not allowed.
+		};
+		ULONG64 Value;
+	};
+} PML4E, * PPML4E;
+
 bool wnbios_lib::to_file()
 {
 	if (std::filesystem::exists(store_at + drv_name))
@@ -289,6 +313,29 @@ bool wnbios_lib::leak_kpointers(std::vector<uintptr_t>& pointers)
 	return true;
 }
 
+uint32_t wnbios_lib::find_self_referencing_pml4e()
+{
+	auto dirbase = get_system_dirbase();
+
+	// find a valid entry
+	for (int i = 1; i < 512; i++)
+	{
+		PML4E pml4e;
+		if (!read_physical_memory((dirbase + i * sizeof(uintptr_t)), &pml4e, sizeof(PML4E)))
+		{
+			return 0;
+		}
+
+		// page backs physical memory
+		if (pml4e.Present && pml4e.PageFrameNumber * 0x1000 == dirbase)
+		{
+			return i;
+		}
+	}
+
+	return -1;
+}
+
 
 uintptr_t wnbios_lib::map_physical(uint64_t address, size_t size, wnbios_mem& mem)
 {
@@ -417,6 +464,30 @@ uintptr_t wnbios_lib::get_process_base(const char* image_name)
 	return image_base_out;
 }
 
+uintptr_t wnbios_lib::get_process_base_um(uint64_t pid, const char* name)
+{
+	uintptr_t modBaseAddr = 0;
+	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid);
+	if (hSnap != INVALID_HANDLE_VALUE)
+	{
+		MODULEENTRY32 modEntry;
+		modEntry.dwSize = sizeof(modEntry);
+		if (Module32First(hSnap, &modEntry))
+		{
+			do
+			{
+				if (!_stricmp(modEntry.szModule, name))
+				{
+					modBaseAddr = (uintptr_t)modEntry.modBaseAddr;
+					break;
+				}
+			} while (Module32Next(hSnap, &modEntry));
+		}
+	}
+	CloseHandle(hSnap);
+	return modBaseAddr;
+}
+
 uintptr_t wnbios_lib::get_ntoskrnl_base()
 {
 	for (int i = 0; i < (0x100000 * 120); i += 0x100000)
@@ -458,6 +529,32 @@ uintptr_t wnbios_lib::find_pattern_at_kernel(uintptr_t base, byte* pattern, cons
 	return result;
 }
 
+uintptr_t wnbios_lib::find_dtb_from_base(uintptr_t base)
+{
+	uint32_t self_ref_entry = find_self_referencing_pml4e();
+	if (self_ref_entry == -1)
+		return 0;
+
+	for (std::uintptr_t i = 3000; i != 0x50000000; i++)
+	{
+		std::uintptr_t dtb = i << 12;
+
+		PML4E PML4E;
+		if (!read_physical_memory((dtb + self_ref_entry * sizeof(uintptr_t)), &PML4E, sizeof(PML4E)))
+			continue;
+
+		if (PML4E.Present == 0 || PML4E.PageFrameNumber * 0x1000 != dtb)
+			continue;
+
+		const auto bytes = read_virtual_memory<short>(base, dtb);
+		if (bytes == 0x5A4D)
+		{
+			return dtb;
+		}
+	}
+	return 0;
+}
+
 bool wnbios_lib::read_physical_memory(uintptr_t physical_address, void* output, unsigned long size)
 {
 	wnbios_mem mem;
@@ -487,13 +584,16 @@ bool wnbios_lib::write_physical_memory(uintptr_t physical_address, void* data, u
 	return true;
 }
 
-uintptr_t wnbios_lib::convert_virtual_to_physical(uintptr_t virtual_address)
+uintptr_t wnbios_lib::convert_virtual_to_physical(uintptr_t virtual_address, uintptr_t dtb)
 {
+	if (dtb == -1)
+		dtb = cr3;
+
 	uintptr_t va = virtual_address;
 
 	unsigned short PML4 = (unsigned short)((va >> 39) & 0x1FF);
 	uintptr_t PML4E = 0;
-	read_physical_memory((cr3 + PML4 * sizeof(uintptr_t)), &PML4E, sizeof(PML4E));
+	read_physical_memory((dtb + PML4 * sizeof(uintptr_t)), &PML4E, sizeof(PML4E));
 
 	if (PML4E == 0)
 		return 0;
@@ -532,7 +632,7 @@ uintptr_t wnbios_lib::convert_virtual_to_physical(uintptr_t virtual_address)
 	return (PTE & 0xFFFFFFFFFF000) + (va & 0xFFF);
 }
 
-bool wnbios_lib::read_virtual_memory(uintptr_t address, LPVOID output, unsigned long size)
+bool wnbios_lib::read_virtual_memory(uintptr_t address, LPVOID output, unsigned long size, uintptr_t dtb)
 {
 	if (!address)
 		return false;
@@ -540,7 +640,7 @@ bool wnbios_lib::read_virtual_memory(uintptr_t address, LPVOID output, unsigned 
 	if (!size)
 		return false;
 
-	uintptr_t physical_address = convert_virtual_to_physical(address);
+	uintptr_t physical_address = convert_virtual_to_physical(address, dtb);
 
 	if (!physical_address)
 		return false;
