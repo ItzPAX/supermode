@@ -26,8 +26,8 @@ int main(int argc, char* argv[])
 	std::cout << "Open the game...\n";
 	system("pause");
 
-	rwptm::init_stored_cr3("explorer.exe", "supermode_me.exe");
-	
+	rwptm::init("explorer.exe", "supermode_me.exe");
+	std::cout << std::hex << rwptm::read_virtual_memory<short>(rwptm::target_base) << std::endl;
 
 	system("pause");
 

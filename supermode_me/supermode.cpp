@@ -160,44 +160,6 @@ uintptr_t supermode::get_process_base_um(uint64_t pid, const char* name)
 	return modBaseAddr;
 }
 
-uintptr_t supermode::get_dtb_from_process_base(uintptr_t base, uintptr_t valid_dtb)
-{
-	auto ntdll_address = (uintptr_t)GetModuleHandleA("ntdll.dll");
-	if (!ntdll_address) {
-		return false;
-	}
-
-	auto nt_dll_physical = supermode::convert_virtual_to_physical(ntdll_address, valid_dtb);
-
-	for (std::uintptr_t i = 3000; i != 0x50000000; i++)
-	{
-		std::uintptr_t dtb = i << 12;
-
-		if (dtb == valid_dtb)
-			continue;
-
-		std::cout << "Checking DTB " << std::hex << dtb << std::dec << "..." << std::endl;
-
-		auto phys_address = supermode::convert_virtual_to_physical(ntdll_address, dtb);
-
-		if (!phys_address)
-			continue;
-
-		if (phys_address == nt_dll_physical)
-		{
-			std::cout << "Valid DTB " << std::hex << dtb << std::dec << "!!!!!!!" << std::endl;
-			bool succ;
-			const auto bytes = supermode::read_virtual_memory<short>(base, &succ, dtb);
-			if (succ && bytes == 0x5A4D)
-			{
-				return dtb;
-			}
-		}
-	}
-
-	return 0;
-}
-
 uintptr_t supermode::get_dtb_from_kprocess(uintptr_t kprocess)
 {
 	byte kproc_buf[0x1000];
@@ -397,9 +359,6 @@ uintptr_t supermode::convert_virtual_to_physical(uintptr_t virtual_address, uint
 
 	uintptr_t va = virtual_address;
 
-	if (tlb[va + cr3] != 0)
-		return tlb[va + cr3];
-
 	unsigned short PML4 = (unsigned short)((va >> 39) & 0x1FF);
 	supermode_comm::PML4E PML4E;
 
@@ -461,4 +420,63 @@ uintptr_t supermode::convert_virtual_to_physical(uintptr_t virtual_address, uint
 
 	tlb[va + cr3] = (PTE.Value & 0xFFFFFFFFFF000) + (va & 0xFFF);
 	return (PTE.Value & 0xFFFFFFFFFF000) + (va & 0xFFF);
+}
+
+uint32_t supermode::find_self_referencing_pml4e()
+{
+	auto dirbase = supermode_comm::system_cr3;
+
+	// find a valid entry
+	for (int i = 0; i < 512; i++)
+	{
+		supermode_comm::PML4E pml4e;
+		if (!supermode_comm::read_physical_memory((dirbase + i * sizeof(uintptr_t)), sizeof(supermode_comm::PML4E), (uint64_t*) & pml4e))
+		{
+			i--; // retry
+			continue;
+		}
+
+		// page backs physical memory
+		if (pml4e.Present && pml4e.PageFrameNumber * 0x1000 == dirbase)
+		{
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+uintptr_t supermode::find_dtb_from_base(uintptr_t base)
+{
+	uint32_t self_ref_entry = find_self_referencing_pml4e();
+	if (self_ref_entry == -1)
+		return 0;
+
+	std::cout << self_ref_entry << std::endl;
+
+	for (std::uintptr_t i = 0x100000; i != 0x50000000; i++)
+	{
+		std::uintptr_t dtb = i << 12;
+
+		std::cout << std::hex << "scanning dtb: " << dtb << std::endl;
+
+		supermode_comm::PML4E pml4e;
+		if (!supermode_comm::read_physical_memory((dtb + self_ref_entry * sizeof(uintptr_t)), sizeof(supermode_comm::PML4E), (uint64_t*)&pml4e))
+			continue;
+
+		if (pml4e.Present == 0 || pml4e.PageFrameNumber * 0x1000 != dtb)
+			continue;
+
+		std::cout << "VALID CR3: " << dtb << std::endl;
+
+		short bytes;
+		if (!read_virtual_memory(base, (uint64_t*)&bytes, sizeof(short), dtb))
+			continue;
+
+		if (bytes == 0x5A4D)
+		{
+			return dtb;
+		}
+	}
+	return 0;
 }

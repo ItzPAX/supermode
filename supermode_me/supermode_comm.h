@@ -122,7 +122,6 @@ namespace supermode_comm
 	static uint64_t mal_pml4_pte_ind[4];
 
 	static uint64_t system_cr3;
-	static uint64_t target_cr3;
 
 	static uint64_t current_pfn = 0;
 
@@ -147,9 +146,6 @@ namespace supermode_comm
 
 		system_cr3 = j["cr3"].get<uint64_t>();
 		std::cout << "system_cr3: 0x" << std::hex << system_cr3 << std::dec << std::endl;
-
-		target_cr3 = j["target_cr3"].get<uint64_t>();
-		std::cout << "target_cr3: 0x" << std::hex << target_cr3 << std::dec << std::endl;
 
 		for (int i = 0; i <= PT; i++)
 		{
@@ -253,9 +249,6 @@ namespace supermode_comm
 	static bool read_physical_memory(uint64_t addr, uint64_t size, uint64_t* buf)
 	{
 		PTE_PFN pfn = calc_pfnpte_from_addr(addr);
-
-		if (pfn.pfn > 0x7FFFFF)
-			return false;
 
 		if (pfn.pfn != current_pfn)
 			change_mal_pt_pfn(pfn.pfn);

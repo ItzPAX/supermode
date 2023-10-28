@@ -59,6 +59,9 @@ namespace supermode {
 
 	static uintptr_t convert_virtual_to_physical(uintptr_t virtual_address, uint64_t cr3 = USE_PROCESS_CR3);
 
+	uint32_t find_self_referencing_pml4e();
+	uintptr_t find_dtb_from_base(uintptr_t base);
+
 	template<typename T>
 	T read_virtual_memory(uintptr_t address, bool* success, uint64_t cr3 = USE_PROCESS_CR3)
 	{
@@ -75,7 +78,6 @@ namespace supermode {
 
 	uint64_t get_process_id(const char* image_name);
 	uintptr_t get_process_base_um(uint64_t pid, const char* name);
-	uintptr_t get_dtb_from_process_base(uintptr_t base, uintptr_t valid_dtb);
 	uintptr_t get_dtb_from_kprocess(uintptr_t kprocess);
 	uintptr_t attach(const char* image_name, uintptr_t* out_cr3, uintptr_t* out_kprocess);
 }

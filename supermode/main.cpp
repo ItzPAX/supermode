@@ -24,17 +24,13 @@ int main()
 
 	DWORD target_pid = supermode::wnbios.get_process_id(target_proc.c_str());
 	uintptr_t target_base = supermode::wnbios.get_process_base_um(target_pid, target_proc.c_str());
-	uintptr_t target_cr3 = supermode::wnbios.find_dtb_from_base(target_base);
-
-	std::cout << "Searching target cr3 this might take a while...\n";
-	std::cout << "Found target cr3: " << std::hex << target_cr3 << std::endl;
 
 	supermode::insert_first_malicious_pte();
 	supermode::insert_second_malicious_pte();
 	supermode::insert_third_malicious_pte(supermode::wnbios.cr3);
 
 	std::cout << "saving indices for target application...\n";
-	supermode::save_indices_for_target(target_cr3);
+	supermode::save_indices_for_target();
 
 	std::cout << "unloading wnbios...\n";
 	supermode::wnbios.unload_driver();
