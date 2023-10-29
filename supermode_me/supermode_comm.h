@@ -7,8 +7,6 @@
 #include <thread>
 #include "json.hpp"
 
-#define PFN_ENC_KEY 0x6942069
-
 namespace supermode_comm
 {
 	typedef struct _PML4E
@@ -122,8 +120,12 @@ namespace supermode_comm
 	static uint64_t mal_pml4_pte_ind[4];
 
 	static uint64_t system_cr3;
+	static uint64_t target_cr3;
 
 	static uint64_t current_pfn = 0;
+
+	// decryption table key = pml4 encrypted pfn val = pml4 decrypted pfn
+	static std::unordered_map<int, int> decryption_table;
 
 	struct PTE_PFN
 	{
@@ -146,6 +148,9 @@ namespace supermode_comm
 
 		system_cr3 = j["cr3"].get<uint64_t>();
 		std::cout << "system_cr3: 0x" << std::hex << system_cr3 << std::dec << std::endl;
+
+		target_cr3 = j["target_cr3"].get<uintptr_t>();
+		std::cout << "target_cr3: 0x" << std::hex << target_cr3 << std::dec << std::endl;
 
 		for (int i = 0; i <= PT; i++)
 		{
@@ -234,16 +239,28 @@ namespace supermode_comm
 		return va;
 	}
 
-	static uintptr_t encdec_pml4e(uint64_t pml4e)
+	static uint64_t dec_pml4e(uint64_t pml4e)
 	{
 		uint64_t va = generate_virtual_address(mal_pml4_pte_ind[PML4], mal_pml4_pte_ind[PDPT], mal_pml4_pte_ind[PD], mal_pml4_pte_ind[PT], pml4e * sizeof(PPML4E));
 
 		PML4E pml4;
 		memcpy(&pml4, (void*)va, sizeof(PML4E));
-		pml4.PageFrameNumber ^= PFN_ENC_KEY;
+		uint64_t fake_pfn = pml4.PageFrameNumber;
+
+		pml4.PageFrameNumber = decryption_table[fake_pfn + pml4e];
 		memcpy((void*)va, &pml4, sizeof(PML4E));
 
-		return va;
+		return fake_pfn;
+	}
+
+	static void enc_pml4e(uint64_t pml4e, uint64_t fake_pfn)
+	{
+		uint64_t va = generate_virtual_address(mal_pml4_pte_ind[PML4], mal_pml4_pte_ind[PDPT], mal_pml4_pte_ind[PD], mal_pml4_pte_ind[PT], pml4e * sizeof(PPML4E));
+
+		PML4E pml4;
+		memcpy(&pml4, (void*)va, sizeof(PML4E));
+		pml4.PageFrameNumber = fake_pfn;
+		memcpy((void*)va, &pml4, sizeof(PML4E));
 	}
 
 	static bool read_physical_memory(uint64_t addr, uint64_t size, uint64_t* buf)

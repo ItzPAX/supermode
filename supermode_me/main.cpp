@@ -26,11 +26,17 @@ int main(int argc, char* argv[])
 	std::cout << "Open the game...\n";
 	system("pause");
 
-	rwptm::init("explorer.exe", "supermode_me.exe");
-	std::cout << std::hex << rwptm::read_virtual_memory<short>(rwptm::target_base) << std::endl;
+	rwptm::init("RustClient.exe", "supermode_me.exe");
 
 	system("pause");
 
+	while (true)
+	{
+		std::cout << std::hex << rwptm::read_virtual_memory<short>(rwptm::target_base) << std::endl;
+		Sleep(1);
+	}
+
+	system("pause");
 
 	return 1;
 }

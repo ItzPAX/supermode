@@ -386,7 +386,7 @@ namespace supermode
 	}
 
 	// goofy ahh
-	void save_indices_for_target()
+	void save_indices_for_target(uintptr_t target_cr3)
 	{
 		nlohmann::json j;
 		j["mal_pte_indices"] = {};
@@ -401,6 +401,7 @@ namespace supermode
 		}
 
 		j["cr3"] = wnbios.get_system_dirbase();
+		j["target_cr3"] = target_cr3;
 
 		std::ofstream out_file("C:\\indices.json");
 		out_file << j.dump();

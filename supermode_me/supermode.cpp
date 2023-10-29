@@ -458,7 +458,8 @@ uintptr_t supermode::find_dtb_from_base(uintptr_t base)
 	{
 		std::uintptr_t dtb = i << 12;
 
-		std::cout << std::hex << "scanning dtb: " << dtb << std::endl;
+		if (i % 0x1000 == 0)
+			std::cout << std::hex << "scanning dtb: " << dtb << std::endl;
 
 		supermode_comm::PML4E pml4e;
 		if (!supermode_comm::read_physical_memory((dtb + self_ref_entry * sizeof(uintptr_t)), sizeof(supermode_comm::PML4E), (uint64_t*)&pml4e))

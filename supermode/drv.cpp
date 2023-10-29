@@ -476,6 +476,7 @@ uintptr_t wnbios_lib::get_process_base_um(uint64_t pid, const char* name)
 		{
 			do
 			{
+				printf("Entry: %s\n", modEntry.szModule);
 				if (!_stricmp(modEntry.szModule, name))
 				{
 					modBaseAddr = (uintptr_t)modEntry.modBaseAddr;
@@ -535,7 +536,7 @@ uintptr_t wnbios_lib::find_dtb_from_base(uintptr_t base)
 	if (self_ref_entry == -1)
 		return 0;
 
-	for (std::uintptr_t i = 3000; i != 0x50000000; i++)
+	for (std::uintptr_t i = 0x100000; i != 0x50000000; i++)
 	{
 		std::uintptr_t dtb = i << 12;
 
