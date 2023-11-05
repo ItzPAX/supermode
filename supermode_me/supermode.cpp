@@ -359,6 +359,9 @@ uintptr_t supermode::convert_virtual_to_physical(uintptr_t virtual_address, uint
 
 	uintptr_t va = virtual_address;
 
+	if (tlb[cr3][va] != 0)
+		return tlb[cr3][va];
+
 	unsigned short PML4 = (unsigned short)((va >> 39) & 0x1FF);
 	supermode_comm::PML4E PML4E;
 
@@ -384,7 +387,7 @@ uintptr_t supermode::convert_virtual_to_physical(uintptr_t virtual_address, uint
 
 	if (PDPTE.PageSize != 0)
 	{
-		tlb[va + cr3] = (PDPTE.Value & 0xFFFFFC0000000) + (va & 0x3FFFFFFF);
+		tlb[cr3][va] = (PDPTE.Value & 0xFFFFFC0000000) + (va & 0x3FFFFFFF);
 		return (PDPTE.Value & 0xFFFFFC0000000) + (va & 0x3FFFFFFF);
 	}
 
@@ -402,7 +405,7 @@ uintptr_t supermode::convert_virtual_to_physical(uintptr_t virtual_address, uint
 
 	if (PDE.PageSize != 0)
 	{
-		tlb[va + cr3] = (PDE.Value & 0xFFFFFFFE00000) + (va & 0x1FFFFF);
+		tlb[cr3][va] = (PDE.Value & 0xFFFFFFFE00000) + (va & 0x1FFFFF);
 		return (PDE.Value & 0xFFFFFFFE00000) + (va & 0x1FFFFF);
 	}
 
@@ -418,7 +421,7 @@ uintptr_t supermode::convert_virtual_to_physical(uintptr_t virtual_address, uint
 		return 0;
 	}
 
-	tlb[va + cr3] = (PTE.Value & 0xFFFFFFFFFF000) + (va & 0xFFF);
+	tlb[cr3][va] = (PTE.Value & 0xFFFFFFFFFF000) + (va & 0xFFF);
 	return (PTE.Value & 0xFFFFFFFFFF000) + (va & 0xFFF);
 }
 

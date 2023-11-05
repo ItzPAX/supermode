@@ -1,5 +1,6 @@
 #pragma once
 #include "supermode.h"
+#include "../settings.h"
 #include <Windows.h>
 #include <iostream>
 #include <unordered_map>
@@ -163,8 +164,16 @@ namespace rwptm
 		if (!target_base)
 			return false;
 
-		std::cout << "populating using: " << std::hex << supermode_comm::target_cr3 << std::endl;
-		rwptm::populate_cached_pml4(supermode_comm::target_cr3);
+		if (EACCR3)
+		{
+			std::cout << "populating using bruteforced DTB: " << std::hex << supermode_comm::target_cr3 << std::endl;
+			rwptm::populate_cached_pml4(supermode_comm::target_cr3);
+		}
+		else
+		{
+			std::cout << "populating using EPROCESS DTB: " << std::hex << target_cr3 << std::endl;
+			rwptm::populate_cached_pml4(target_cr3);
+		}
 
 		uintptr_t attacker_cr3, attacker_eproc;
 		uintptr_t attacker_base = supermode::attach(local_application, &attacker_cr3, &attacker_eproc);

@@ -1,10 +1,10 @@
 #include "supermode.h"
-
-std::string target_proc = "explorer.exe";
+#include "../settings.h"
 
 void start_thread()
 {
-	system("supermode_me.exe SUPERMODE");
+	std::string command = LOCAL_NAME + " SUPERMODE";
+	system(command.c_str());
 }
 
 int main()
@@ -14,13 +14,18 @@ int main()
 	if (h)
 		CloseHandle(h);
 
-	uintptr_t target_base = supermode::wnbios.get_process_base(target_proc.c_str());
+	uintptr_t target_base = supermode::wnbios.get_process_base(TARGET_NAME.c_str());
 
-	std::cout << "bruteforcing process dtb, this might take a while...\n";
-	uintptr_t target_cr3 = supermode::wnbios.find_dtb_from_base(target_base);
-	std::cout << std::hex << target_cr3 << std::endl;
+	uintptr_t target_cr3 = 0;
 
-	while (!supermode::wnbios.get_process_base("supermode_me.exe"))
+	if (EACCR3)
+	{
+		std::cout << "bruteforcing process dtb, this might take a while...\n";
+		target_cr3 = supermode::wnbios.find_dtb_from_base(target_base);
+		std::cout << std::hex << target_cr3 << std::endl;
+	}
+
+	while (!supermode::wnbios.get_process_base(LOCAL_NAME.c_str()))
 	{
 		std::cout << "Waiting for target application...\n";
 		Sleep(1000);

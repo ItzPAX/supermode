@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
 	std::cout << "Open the game...\n";
 	system("pause");
 
-	rwptm::init("explorer.exe", "supermode_me.exe");
+	rwptm::init(TARGET_NAME.c_str(), LOCAL_NAME.c_str());
 
 	system("pause");
 

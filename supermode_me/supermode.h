@@ -37,7 +37,7 @@ struct SYSTEM_HANDLE_INFORMATION_EX
 };
 
 namespace supermode {
-	static std::unordered_map<uintptr_t, uintptr_t> tlb;
+	static std::unordered_map<uintptr_t, std::unordered_map<uintptr_t, uintptr_t>> tlb;
 
 	static uintptr_t EP_DIRECTORYTABLE = 0x028;
 	static uintptr_t EP_UNIQUEPROCESSID = 0;

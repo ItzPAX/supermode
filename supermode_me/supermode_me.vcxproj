@@ -133,6 +133,7 @@
     <ClCompile Include="supermode.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\settings.h" />
     <ClInclude Include="rwptm.h" />
     <ClInclude Include="supermode.h" />
     <ClInclude Include="json.hpp" />

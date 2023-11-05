@@ -35,5 +35,8 @@
     <ClInclude Include="rwptm.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="..\settings.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
