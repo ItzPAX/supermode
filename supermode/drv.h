@@ -1546,6 +1546,7 @@ private:
 public:
 	uintptr_t cr3 = 0;
 	uint32_t attached_proc = 0;
+	uintptr_t attached_eproc;
 
 	wnbios_lib()
 	{

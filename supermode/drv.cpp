@@ -456,6 +456,7 @@ uintptr_t wnbios_lib::get_process_base(const char* image_name)
 			image_base_out = base_address;
 			cr3 = directory_table;
 			attached_proc = process_id;
+			attached_eproc = kprocess;
 
 			break;
 		}
@@ -539,6 +540,9 @@ uintptr_t wnbios_lib::find_dtb_from_base(uintptr_t base)
 	for (std::uintptr_t i = 0x100000; i != 0x50000000; i++)
 	{
 		std::uintptr_t dtb = i << 12;
+
+		if (i % 0x100000 == 0)
+			printf("reached dtb: 0x%p\n", dtb);
 
 		PML4E PML4E;
 		if (!read_physical_memory((dtb + self_ref_entry * sizeof(uintptr_t)), &PML4E, sizeof(PML4E)))

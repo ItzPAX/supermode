@@ -1,6 +1,6 @@
 #include "supermode.h"
 
-std::string target_proc = "RustClient.exe";
+std::string target_proc = "explorer.exe";
 
 void start_thread()
 {
@@ -15,6 +15,8 @@ int main()
 		CloseHandle(h);
 
 	uintptr_t target_base = supermode::wnbios.get_process_base(target_proc.c_str());
+
+	std::cout << "bruteforcing process dtb, this might take a while...\n";
 	uintptr_t target_cr3 = supermode::wnbios.find_dtb_from_base(target_base);
 	std::cout << std::hex << target_cr3 << std::endl;
 
@@ -25,7 +27,8 @@ int main()
 	}
 
 	Sleep(1000);
-
+	std::cout << "populating forbidden zones...\n";
+	supermode::fill_forbidden_zones(supermode::wnbios.cr3, supermode::wnbios.attached_eproc);
 
 	supermode::insert_first_malicious_pte();
 	supermode::insert_second_malicious_pte();

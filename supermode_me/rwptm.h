@@ -158,16 +158,19 @@ namespace rwptm
 	{
 		supermode_comm::load();
 
-		uintptr_t target_cr3, tmp1;
-		target_base = supermode::attach(target_application, &target_cr3, &tmp1);
+		uintptr_t target_cr3, target_eproc;
+		target_base = supermode::attach(target_application, &target_cr3, &target_eproc);
 		if (!target_base)
 			return false;
 
 		std::cout << "populating using: " << std::hex << supermode_comm::target_cr3 << std::endl;
 		rwptm::populate_cached_pml4(supermode_comm::target_cr3);
 
-		uintptr_t attacker_cr3;
-		uintptr_t attacker_base = supermode::attach(local_application, &attacker_cr3, &tmp1);
+		uintptr_t attacker_cr3, attacker_eproc;
+		uintptr_t attacker_base = supermode::attach(local_application, &attacker_cr3, &attacker_eproc);
+
+		std::cout << std::hex << attacker_eproc << std::endl;
+
 		rwptm::setup_pml4_table(attacker_cr3);
 
 		return true;

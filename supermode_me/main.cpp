@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
 	std::cout << "Open the game...\n";
 	system("pause");
 
-	rwptm::init("RustClient.exe", "supermode_me.exe");
+	rwptm::init("explorer.exe", "supermode_me.exe");
 
 	system("pause");
 
