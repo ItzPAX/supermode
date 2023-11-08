@@ -32,7 +32,6 @@ namespace rwptm
 	} PML4E, * PPML4E;
 
 	std::unordered_map<int, PML4E> cached_pml4;
-	std::unordered_map<int, int> translation_table;
 
 	// populates internal pml4 cache you should call this when attached to the target pocess
 	void populate_cached_pml4(uintptr_t cr3)
@@ -60,7 +59,7 @@ namespace rwptm
 		std::cout << "Stored " << cached_pml4.size() << " PML4 entries\n";
 	}
 
-	// encrypt pml4e pfn, copy all present pml4e into local pml4 and setup translation table
+	// get free local pml4e to create target pml4e in
 	void setup_pml4_table(uintptr_t cr3)
 	{
 		std::cout << "Copying PML4 of target process to local pml4\n";
@@ -70,86 +69,41 @@ namespace rwptm
 			return;
 		}
 
-		// get all valid pml4 of local process
-		std::vector<uintptr_t> local_pml4s;
-		for (auto& pml4e_map : cached_pml4)
+		// get all free pml4 of local process we will use those fuckers later
+		for (int i = 0; i < 512; i++)
 		{
-			PML4E pml4e_target = pml4e_map.second;
+			PML4E pml4e_attacker;
+			supermode_comm::read_physical_memory((cr3 + i * sizeof(uintptr_t)), sizeof(PML4E), (uint64_t*)&pml4e_attacker);
 
-			for (int i = 0; i < 512; i++)
+			// page is free for our use
+			if (!pml4e_attacker.Present)
 			{
-				PML4E pml4e_attacker;
-				supermode_comm::read_physical_memory((cr3 + i * sizeof(uintptr_t)), sizeof(PML4E), (uint64_t*)&pml4e_attacker);
-
-				// page is free for our use
-				if (pml4e_attacker.Present)
-				{
-					std::cout << "found valid pml4 locally\n";
-					local_pml4s.push_back(pml4e_attacker.PageFrameNumber);
-					break;
-				}
+				supermode_comm::free_pml4s.push_back(i);
 			}
 		}
-
-		// populate local pml4 with target pml4 entries
-		for (auto& pml4e_map : cached_pml4)
-		{
-			PML4E pml4e_target = pml4e_map.second;
-
-			for (int i = 0; i < 512; i++)
-			{
-				PML4E pml4e_attacker;
-				supermode_comm::read_physical_memory((cr3 + i * sizeof(uintptr_t)), sizeof(PML4E), (uint64_t*)&pml4e_attacker);
-
-				// page is free for our use
-				if (!pml4e_attacker.Present)
-				{
-					translation_table[pml4e_map.first] = i;
-
-					std::cout << i << ": changing pml4e pfn from " << pml4e_target.PageFrameNumber;
-					uint64_t orig_pfn = pml4e_target.PageFrameNumber;
-					int pfnidx = (rand() + i) % local_pml4s.size();
-					pml4e_target.PageFrameNumber = local_pml4s[pfnidx];
-					supermode_comm::decryption_table[pml4e_target.PageFrameNumber + i] = orig_pfn;
-					std::cout << " to " << pml4e_target.PageFrameNumber << " stored for decryption: " << supermode_comm::decryption_table[pml4e_target.PageFrameNumber + i] << " index in decryption table: " << pml4e_target.PageFrameNumber + pml4e_map.first << std::endl;
-
-					supermode_comm::write_physical_memory(cr3 + i * sizeof(uintptr_t), sizeof(PML4E), (uint64_t*) & pml4e_target);
-					break;
-				}
-			}
-		}
+		std::cout << "stored " << supermode_comm::free_pml4s.size() << " free entries!\n";
 	}
 
-	uintptr_t correct_virtual_address(uintptr_t virtual_address)
+	uintptr_t swap_pml4e_from_va(uint64_t new_pml4, uintptr_t original_va)
 	{
-		const uint64_t originalAddress = virtual_address;
+		const uint64_t originalAddress = original_va;
 		uint64_t newAddress;
-
-		unsigned short originalPML4 = (unsigned short)((originalAddress >> 39) & 0x1FF);
-
 		const uint64_t pml4Mask = 0x0000FF8000000000;
-
 		newAddress = originalAddress & ~pml4Mask;
-
-		newAddress |= (uint64_t)(translation_table[originalPML4]) << 39;
-
+		newAddress |= new_pml4 << 39;
 		return newAddress;
 	}
 
-	uint64_t dec_pml4e_pfn(uintptr_t virtual_address)
+	// returns the index of the created pml4
+	uint64_t create_pml4e(ULONG64 pml4e)
 	{
-		const uint64_t originalAddress = virtual_address;
-		unsigned short originalPML4 = (unsigned short)((originalAddress >> 39) & 0x1FF);
-
-		return supermode_comm::dec_pml4e(originalPML4);
+		return supermode_comm::create_pml4(pml4e);
 	}
-
-	void enc_pml4e_pfn(uintptr_t virtual_address, uint64_t fake_pfn)
+	
+	// destroys the pml4 at specified index
+	void destroy_pml4e(uint64_t pml4e_ind)
 	{
-		const uint64_t originalAddress = virtual_address;
-		unsigned short originalPML4 = (unsigned short)((originalAddress >> 39) & 0x1FF);
-
-		supermode_comm::enc_pml4e(originalPML4, fake_pfn);
+		supermode_comm::destroy_pml4e(pml4e_ind);
 	}
 
 	uintptr_t target_base, target_cr3, target_eproc, local_base, local_cr3, local_eproc;
@@ -158,6 +112,8 @@ namespace rwptm
 
 	bool init(const char* target_application, const char* local_application)
 	{
+		srand(time(0));
+
 		supermode_comm::load();
 
 		target_base = supermode::attach(target_application, &target_cr3, &target_eproc);
@@ -186,13 +142,17 @@ namespace rwptm
 	T read_virtual_memory(uintptr_t address)
 	{
 		T out;
-		uintptr_t fixed_addr = correct_virtual_address(address);
-		uint64_t fake_pfn = dec_pml4e_pfn(fixed_addr);
+
+		unsigned short orig_pml4e_ind = (unsigned short)((address >> 39) & 0x1FF);
+
+		uint64_t created_pml4e_ind = create_pml4e(cached_pml4[orig_pml4e_ind].Value);
+		uintptr_t fixed_addr = swap_pml4e_from_va(created_pml4e_ind, address);
 
 		MemoryFence();
 
 		memcpy(&out, (void*)fixed_addr, sizeof(T));
-		enc_pml4e_pfn(fixed_addr, fake_pfn);
+
+		destroy_pml4e(created_pml4e_ind);
 
 		MemoryFence();
 
@@ -202,13 +162,14 @@ namespace rwptm
 	template <typename T>
 	void write_virtual_memory(uintptr_t address, T val)
 	{
-		uintptr_t fixed_addr = correct_virtual_address(address);
-		uint64_t fake_pfn = dec_pml4e_pfn(fixed_addr);
-
+		unsigned short orig_pml4e_ind = (unsigned short)((address >> 39) & 0x1FF);
+		uint64_t created_pml4e_ind = create_pml4e(cached_pml4[orig_pml4e_ind].Value);
+		uintptr_t fixed_addr = swap_pml4e_from_va(created_pml4e_ind, address);
 		MemoryFence();
 
-		memcpy((void*)fixed_addr, (void*)&val, sizeof(T));		
-		enc_pml4e_pfn(fixed_addr, fake_pfn);
+		memcpy((void*)fixed_addr, &val, sizeof(T));
+
+		destroy_pml4e(created_pml4e_ind);
 
 		MemoryFence();
 

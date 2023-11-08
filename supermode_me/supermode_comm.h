@@ -124,8 +124,7 @@ namespace supermode_comm
 
 	static uint64_t current_pfn = 0;
 
-	// decryption table key = pml4 encrypted pfn val = pml4 decrypted pfn
-	static std::unordered_map<int, int> decryption_table;
+	static std::vector<uint64_t> free_pml4s;
 
 	struct PTE_PFN
 	{
@@ -239,27 +238,35 @@ namespace supermode_comm
 		return va;
 	}
 
-	static uint64_t dec_pml4e(uint64_t pml4e)
+	static int cycle = 0;
+	static uint64_t create_pml4(ULONG64 pml4e)
 	{
-		uint64_t va = generate_virtual_address(mal_pml4_pte_ind[PML4], mal_pml4_pte_ind[PDPT], mal_pml4_pte_ind[PD], mal_pml4_pte_ind[PT], pml4e * sizeof(PPML4E));
+		if (cycle == free_pml4s.size())
+			cycle = 0;
 
-		PML4E pml4;
-		memcpy(&pml4, (void*)va, sizeof(PML4E));
-		uint64_t fake_pfn = pml4.PageFrameNumber;
+		uint64_t pml4e_ind = free_pml4s.at(cycle);
+		cycle++;
 
-		pml4.PageFrameNumber = decryption_table[fake_pfn + pml4e];
-		memcpy((void*)va, &pml4, sizeof(PML4E));
+		uint64_t va = generate_virtual_address(mal_pml4_pte_ind[PML4], mal_pml4_pte_ind[PDPT], mal_pml4_pte_ind[PD], mal_pml4_pte_ind[PT], pml4e_ind * sizeof(PPML4E));
 
-		return fake_pfn;
+	    memcpy((void*)va, &pml4e, sizeof(ULONG64));
+
+		return pml4e_ind;
 	}
 
-	static void enc_pml4e(uint64_t pml4e, uint64_t fake_pfn)
+	static void destroy_pml4e(uint64_t pml4e_ind)
 	{
-		uint64_t va = generate_virtual_address(mal_pml4_pte_ind[PML4], mal_pml4_pte_ind[PDPT], mal_pml4_pte_ind[PD], mal_pml4_pte_ind[PT], pml4e * sizeof(PPML4E));
+		uint64_t va = generate_virtual_address(mal_pml4_pte_ind[PML4], mal_pml4_pte_ind[PDPT], mal_pml4_pte_ind[PD], mal_pml4_pte_ind[PT], pml4e_ind * sizeof(PPML4E));
 
 		PML4E pml4;
-		memcpy(&pml4, (void*)va, sizeof(PML4E));
-		pml4.PageFrameNumber = fake_pfn;
+		unsigned int randValue = static_cast<unsigned int>(rand());
+
+		pml4.Value |= static_cast<ULONG64>(randValue);
+		pml4.Value |= static_cast<ULONG64>(randValue) << 16;
+		pml4.Value |= static_cast<ULONG64>(randValue) << 32;
+		pml4.Value |= static_cast<ULONG64>(randValue) << 48;
+		pml4.Present = 0;
+
 		memcpy((void*)va, &pml4, sizeof(PML4E));
 	}
 
