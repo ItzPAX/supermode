@@ -241,7 +241,8 @@ namespace supermode_comm
 	static int cycle = 0;
 	static uint64_t create_pml4(ULONG64 pml4e)
 	{
-		if (cycle == free_pml4s.size())
+		// only use upper half of free entries for whatever reason
+		if (cycle >= (int)(free_pml4s.size() / 2))
 			cycle = 0;
 
 		uint64_t pml4e_ind = free_pml4s.at(cycle);
