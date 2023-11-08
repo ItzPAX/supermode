@@ -1,4 +1,5 @@
 #include "supermode.h"
+#include <filesystem>
 
 void supermode::get_eprocess_offsets()
 {
@@ -24,6 +25,7 @@ void supermode::get_eprocess_offsets()
 		EP_ACTIVEPROCESSLINK = 0x448;
 		EP_VIRTUALSIZE = 0x498;
 		EP_SECTIONBASE = 0x520;
+		EP_PEB = 0x550;
 		EP_IMAGEFILENAME = 0x5a8;
 		break;
 	case 19045: // WIN10_22H2
@@ -31,6 +33,7 @@ void supermode::get_eprocess_offsets()
 		EP_ACTIVEPROCESSLINK = 0x448;
 		EP_VIRTUALSIZE = 0x498;
 		EP_SECTIONBASE = 0x520;
+		EP_PEB = 0x550;
 		EP_IMAGEFILENAME = 0x5a8;
 		break;
 	case 19044: //WIN10_21H2
@@ -38,6 +41,7 @@ void supermode::get_eprocess_offsets()
 		EP_ACTIVEPROCESSLINK = 0x448;
 		EP_VIRTUALSIZE = 0x498;
 		EP_SECTIONBASE = 0x520;
+		EP_PEB = 0x550;
 		EP_IMAGEFILENAME = 0x5a8;
 		break;
 	case 19043: //WIN10_21H1
@@ -45,6 +49,7 @@ void supermode::get_eprocess_offsets()
 		EP_ACTIVEPROCESSLINK = 0x448;
 		EP_VIRTUALSIZE = 0x498;
 		EP_SECTIONBASE = 0x520;
+		EP_PEB = 0x550;
 		EP_IMAGEFILENAME = 0x5a8;
 		break;
 	case 19042: //WIN10_20H2
@@ -52,6 +57,7 @@ void supermode::get_eprocess_offsets()
 		EP_ACTIVEPROCESSLINK = 0x448;
 		EP_VIRTUALSIZE = 0x498;
 		EP_SECTIONBASE = 0x520;
+		EP_PEB = 0x550;
 		EP_IMAGEFILENAME = 0x5a8;
 		break;
 	case 19041: //WIN10_20H1
@@ -59,6 +65,7 @@ void supermode::get_eprocess_offsets()
 		EP_ACTIVEPROCESSLINK = 0x448;
 		EP_VIRTUALSIZE = 0x498;
 		EP_SECTIONBASE = 0x520;
+		EP_PEB = 0x550;
 		EP_IMAGEFILENAME = 0x5a8;
 		break;
 	case 18363: //WIN10_19H2
@@ -66,6 +73,7 @@ void supermode::get_eprocess_offsets()
 		EP_ACTIVEPROCESSLINK = 0x2f0;
 		EP_VIRTUALSIZE = 0x340;
 		EP_SECTIONBASE = 0x3c8;
+		EP_PEB = 0x3f8;
 		EP_IMAGEFILENAME = 0x450;
 		break;
 	case 18362: //WIN10_19H1
@@ -73,6 +81,7 @@ void supermode::get_eprocess_offsets()
 		EP_ACTIVEPROCESSLINK = 0x2f0;
 		EP_VIRTUALSIZE = 0x340;
 		EP_SECTIONBASE = 0x3c8;
+		EP_PEB = 0x3f8;
 		EP_IMAGEFILENAME = 0x450;
 		break;
 	case 17763: //WIN10_RS5
@@ -80,6 +89,7 @@ void supermode::get_eprocess_offsets()
 		EP_ACTIVEPROCESSLINK = 0x2e8;
 		EP_VIRTUALSIZE = 0x338;
 		EP_SECTIONBASE = 0x3c0;
+		EP_PEB = 0x3f8;
 		EP_IMAGEFILENAME = 0x450;
 		break;
 	case 17134: //WIN10_RS4
@@ -87,6 +97,7 @@ void supermode::get_eprocess_offsets()
 		EP_ACTIVEPROCESSLINK = 0x2e8;
 		EP_VIRTUALSIZE = 0x338;
 		EP_SECTIONBASE = 0x3c0;
+		EP_PEB = 0x3f8;
 		EP_IMAGEFILENAME = 0x450;
 		break;
 	case 16299: //WIN10_RS3
@@ -94,6 +105,7 @@ void supermode::get_eprocess_offsets()
 		EP_ACTIVEPROCESSLINK = 0x2e8;
 		EP_VIRTUALSIZE = 0x338;
 		EP_SECTIONBASE = 0x3c0;
+		EP_PEB = 0x3f8;
 		EP_IMAGEFILENAME = 0x450;
 		break;
 	case 15063: //WIN10_RS2
@@ -101,6 +113,7 @@ void supermode::get_eprocess_offsets()
 		EP_ACTIVEPROCESSLINK = 0x2e8;
 		EP_VIRTUALSIZE = 0x338;
 		EP_SECTIONBASE = 0x3c0;
+		EP_PEB = 0x3f8;
 		EP_IMAGEFILENAME = 0x450;
 		break;
 	case 14393: //WIN10_RS1
@@ -108,6 +121,7 @@ void supermode::get_eprocess_offsets()
 		EP_ACTIVEPROCESSLINK = 0x2f0;
 		EP_VIRTUALSIZE = 0x338;
 		EP_SECTIONBASE = 0x3c0;
+		EP_PEB = 0x3f8;
 		EP_IMAGEFILENAME = 0x450;
 		break;
 	default:
@@ -350,6 +364,44 @@ bool supermode::write_virtual_memory(uintptr_t address, uint64_t* data, unsigned
 
 	supermode_comm::write_physical_memory(physical_address, size, data);
 	return true;
+}
+
+uintptr_t supermode::get_module_base(const wchar_t* module_name, uintptr_t kprocess, uintptr_t dtb)
+{
+	get_eprocess_offsets();
+	uintptr_t peb;
+	read_virtual_memory(kprocess + EP_PEB, (uint64_t*)&peb, sizeof(uintptr_t), dtb);
+
+	uintptr_t pldr;
+	read_virtual_memory(peb + 0x18, (uint64_t*)&pldr, sizeof(uintptr_t), dtb);
+
+	_PEB_LDR_DATA ldr;
+	read_virtual_memory(pldr, (uint64_t*)&ldr, sizeof(ldr), dtb);
+
+	int limit = 0x100;
+	LIST_ENTRY head = ldr.InMemoryOrderModuleList;
+	LIST_ENTRY flink = head;
+
+	while (limit)
+	{
+		limit--;
+
+		supermode::_LDR_DATA_TABLE_ENTRY* pmodule = CONTAINING_RECORD(flink.Flink, supermode::_LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
+
+		supermode::_LDR_DATA_TABLE_ENTRY module;
+		read_virtual_memory((uintptr_t)pmodule, (uint64_t*)&module, sizeof(module), dtb);
+
+		
+		if (module.BaseDllName.Length != 0 && module.BaseDllName.Buffer[0] != 0)
+			if (_wcsicmp(module_name, module.BaseDllName.Buffer) == 0)
+			{
+				return (uintptr_t)module.DllBase;
+			}
+
+		read_virtual_memory((uintptr_t)flink.Flink, (uintptr_t*)&flink, sizeof(LIST_ENTRY), dtb);
+	}
+
+	return 0;
 }
 
 uintptr_t supermode::convert_virtual_to_physical(uintptr_t virtual_address, uint64_t cr3)

@@ -182,6 +182,9 @@ namespace rwptm
 
 		rwptm::setup_pml4_table(attacker_cr3);
 
+		system("pause");
+		std::cout << "NTDLL base: " << supermode::get_module_base(L"ntdll.dll", attacker_eproc, attacker_cr3) << std::endl;
+
 		return true;
 	}
 

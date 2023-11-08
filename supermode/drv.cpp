@@ -159,6 +159,7 @@ void wnbios_lib::get_eprocess_offsets() {
 		EP_VIRTUALSIZE = 0x498;
 		EP_SECTIONBASE = 0x520;
 		EP_IMAGEFILENAME = 0x5a8;
+		EP_VADROOT = 0x7d8;
 		break;
 	case 19045: // WIN10_22H2
 		EP_UNIQUEPROCESSID = 0x440;
@@ -166,6 +167,7 @@ void wnbios_lib::get_eprocess_offsets() {
 		EP_VIRTUALSIZE = 0x498;
 		EP_SECTIONBASE = 0x520;
 		EP_IMAGEFILENAME = 0x5a8;
+		EP_VADROOT = 0x7d8;
 		break;
 	case 19044: //WIN10_21H2
 		EP_UNIQUEPROCESSID = 0x440;
@@ -173,6 +175,7 @@ void wnbios_lib::get_eprocess_offsets() {
 		EP_VIRTUALSIZE = 0x498;
 		EP_SECTIONBASE = 0x520;
 		EP_IMAGEFILENAME = 0x5a8;
+		EP_VADROOT = 0x7d8;
 		break;
 	case 19043: //WIN10_21H1
 		EP_UNIQUEPROCESSID = 0x440;
@@ -180,6 +183,7 @@ void wnbios_lib::get_eprocess_offsets() {
 		EP_VIRTUALSIZE = 0x498;
 		EP_SECTIONBASE = 0x520;
 		EP_IMAGEFILENAME = 0x5a8;
+		EP_VADROOT = 0x7d8;
 		break;
 	case 19042: //WIN10_20H2
 		EP_UNIQUEPROCESSID = 0x440;
@@ -194,6 +198,7 @@ void wnbios_lib::get_eprocess_offsets() {
 		EP_VIRTUALSIZE = 0x498;
 		EP_SECTIONBASE = 0x520;
 		EP_IMAGEFILENAME = 0x5a8;
+		EP_VADROOT = 0x7d8;
 		break;
 	case 18363: //WIN10_19H2
 		EP_UNIQUEPROCESSID = 0x2e8;
@@ -201,6 +206,7 @@ void wnbios_lib::get_eprocess_offsets() {
 		EP_VIRTUALSIZE = 0x340;
 		EP_SECTIONBASE = 0x3c8;
 		EP_IMAGEFILENAME = 0x450;
+		EP_VADROOT = 0x658;
 		break;
 	case 18362: //WIN10_19H1
 		EP_UNIQUEPROCESSID = 0x2e8;
@@ -208,6 +214,7 @@ void wnbios_lib::get_eprocess_offsets() {
 		EP_VIRTUALSIZE = 0x340;
 		EP_SECTIONBASE = 0x3c8;
 		EP_IMAGEFILENAME = 0x450;
+		EP_VADROOT = 0x658;
 		break;
 	case 17763: //WIN10_RS5
 		EP_UNIQUEPROCESSID = 0x2e0;
@@ -215,6 +222,7 @@ void wnbios_lib::get_eprocess_offsets() {
 		EP_VIRTUALSIZE = 0x338;
 		EP_SECTIONBASE = 0x3c0;
 		EP_IMAGEFILENAME = 0x450;
+		EP_VADROOT = 0x628;
 		break;
 	case 17134: //WIN10_RS4
 		EP_UNIQUEPROCESSID = 0x2e0;
@@ -222,6 +230,7 @@ void wnbios_lib::get_eprocess_offsets() {
 		EP_VIRTUALSIZE = 0x338;
 		EP_SECTIONBASE = 0x3c0;
 		EP_IMAGEFILENAME = 0x450;
+		EP_VADROOT = 0x628;
 		break;
 	case 16299: //WIN10_RS3
 		EP_UNIQUEPROCESSID = 0x2e0;
@@ -229,6 +238,7 @@ void wnbios_lib::get_eprocess_offsets() {
 		EP_VIRTUALSIZE = 0x338;
 		EP_SECTIONBASE = 0x3c0;
 		EP_IMAGEFILENAME = 0x450;
+		EP_VADROOT = 0x628;
 		break;
 	case 15063: //WIN10_RS2
 		EP_UNIQUEPROCESSID = 0x2e0;
@@ -236,6 +246,7 @@ void wnbios_lib::get_eprocess_offsets() {
 		EP_VIRTUALSIZE = 0x338;
 		EP_SECTIONBASE = 0x3c0;
 		EP_IMAGEFILENAME = 0x450;
+		EP_VADROOT = 0x628;
 		break;
 	case 14393: //WIN10_RS1
 		EP_UNIQUEPROCESSID = 0x2e8;
@@ -243,6 +254,7 @@ void wnbios_lib::get_eprocess_offsets() {
 		EP_VIRTUALSIZE = 0x338;
 		EP_SECTIONBASE = 0x3c0;
 		EP_IMAGEFILENAME = 0x450;
+		EP_VADROOT = 0x620;
 		break;
 	default:
 		exit(0);

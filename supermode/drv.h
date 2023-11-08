@@ -1544,6 +1544,8 @@ private:
 	SC_HANDLE hSC = NULL;
 
 public:
+	uintptr_t EP_VADROOT = 0;
+
 	uintptr_t cr3 = 0;
 	uint32_t attached_proc = 0;
 	uintptr_t attached_eproc;

@@ -178,12 +178,10 @@ namespace supermode
 			return;
 		}
 
-		std::cout << "checking vad entry at: 0x" << std::hex << node << std::endl;
-
 		DWORD64 start_va_adjusted = get_adjusted_va(TRUE, *node);
 		DWORD64 end_va_adjusted = get_adjusted_va(FALSE, *node);
 
-		std::cout << std::hex << " start: " << std::hex << start_va_adjusted << " end : " << end_va_adjusted << std::endl;
+		std::cout << "VAD Entry at: 0x" << std::hex << node << " start: " << std::hex << start_va_adjusted << " end : " << end_va_adjusted << std::endl;
 		forbidden_zones.push_back({ start_va_adjusted, end_va_adjusted });
 
 		if (node->Left != nullptr) {
@@ -204,8 +202,9 @@ namespace supermode
 	void fill_forbidden_zones(uintptr_t dtb, uintptr_t eproc)
 	{
 		PVAD_NODE lpVadRoot;
+		wnbios.get_eprocess_offsets();
 		uintptr_t system_cr3 = wnbios.get_system_dirbase();
-		if (!wnbios.read_virtual_memory((eproc + 0x7d8), (uint64_t*)&lpVadRoot, sizeof(PVAD_NODE), system_cr3))
+		if (!wnbios.read_virtual_memory((eproc + wnbios.EP_VADROOT), (uint64_t*)&lpVadRoot, sizeof(PVAD_NODE), system_cr3))
 			return;
 
 		VAD_NODE vad;
@@ -213,6 +212,7 @@ namespace supermode
 			return;
 
 		avl_iterate_over(&vad, dtb);
+		std::cout << "added " << forbidden_zones.size() << " forbidden zones\n";
 	}
 
 	void valid_pml4e(uint64_t* pml4ind, uint64_t* pdptstruct)
