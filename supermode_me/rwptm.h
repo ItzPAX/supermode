@@ -152,14 +152,14 @@ namespace rwptm
 		supermode_comm::enc_pml4e(originalPML4, fake_pfn);
 	}
 
+	uintptr_t target_base, target_cr3, target_eproc, local_base, local_cr3, local_eproc;
+
 	// -------- USER FUNCS ---------
-	uintptr_t target_base = 0;
 
 	bool init(const char* target_application, const char* local_application)
 	{
 		supermode_comm::load();
 
-		uintptr_t target_cr3, target_eproc;
 		target_base = supermode::attach(target_application, &target_cr3, &target_eproc);
 		if (!target_base)
 			return false;
@@ -175,15 +175,9 @@ namespace rwptm
 			rwptm::populate_cached_pml4(target_cr3);
 		}
 
-		uintptr_t attacker_cr3, attacker_eproc;
-		uintptr_t attacker_base = supermode::attach(local_application, &attacker_cr3, &attacker_eproc);
-
-		std::cout << std::hex << attacker_eproc << std::endl;
-
-		rwptm::setup_pml4_table(attacker_cr3);
-
-		system("pause");
-		std::cout << "NTDLL base: " << supermode::get_module_base(L"ntdll.dll", attacker_eproc, attacker_cr3) << std::endl;
+		local_base = supermode::attach(local_application, &local_cr3, &local_eproc);
+		std::cout << std::hex << local_eproc << std::endl;
+		rwptm::setup_pml4_table(local_cr3);
 
 		return true;
 	}

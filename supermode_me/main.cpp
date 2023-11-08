@@ -28,7 +28,7 @@ int main(int argc, char* argv[])
 
 	rwptm::init(TARGET_NAME.c_str(), LOCAL_NAME.c_str());
 
-	system("pause");
+	std::cout << "NTDLL base: " << supermode::get_module_base(L"ntdll.dll", rwptm::local_eproc, rwptm::local_cr3) << std::endl;
 
 	while (true)
 	{

@@ -392,11 +392,10 @@ uintptr_t supermode::get_module_base(const wchar_t* module_name, uintptr_t kproc
 		read_virtual_memory((uintptr_t)pmodule, (uint64_t*)&module, sizeof(module), dtb);
 
 		
-		if (module.BaseDllName.Length != 0 && module.BaseDllName.Buffer[0] != 0)
-			if (_wcsicmp(module_name, module.BaseDllName.Buffer) == 0)
-			{
-				return (uintptr_t)module.DllBase;
-			}
+		if (_wcsicmp(module_name, module.BaseDllName.Buffer) == 0)
+		{
+			return (uintptr_t)module.DllBase;
+		}
 
 		read_virtual_memory((uintptr_t)flink.Flink, (uintptr_t*)&flink, sizeof(LIST_ENTRY), dtb);
 	}
