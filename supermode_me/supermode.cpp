@@ -368,6 +368,8 @@ bool supermode::write_virtual_memory(uintptr_t address, uint64_t* data, unsigned
 
 uintptr_t supermode::get_module_base(const wchar_t* module_name, uintptr_t kprocess, uintptr_t dtb)
 {
+	std::wcout << L"getting " << module_name << " using eproc: " << kprocess << " and dtb " << dtb << std::endl;
+
 	get_eprocess_offsets();
 	uintptr_t peb;
 	read_virtual_memory(kprocess + EP_PEB, (uint64_t*)&peb, sizeof(uintptr_t), dtb);
@@ -390,13 +392,23 @@ uintptr_t supermode::get_module_base(const wchar_t* module_name, uintptr_t kproc
 
 		supermode::_LDR_DATA_TABLE_ENTRY module;
 		read_virtual_memory((uintptr_t)pmodule, (uint64_t*)&module, sizeof(module), dtb);
+		PWCHAR str = (PWCHAR)malloc(module.BaseDllName.Length + 2);
+		if (!str)
+			goto exit;
 
+		memset(str, 0, module.BaseDllName.Length + 2);
 		
-		if (_wcsicmp(module_name, module.BaseDllName.Buffer) == 0)
+		if (!read_virtual_memory((uintptr_t)module.BaseDllName.Buffer, (uint64_t*)str, module.BaseDllName.Length, dtb))
+			goto exit;
+
+		if (_wcsicmp(module_name, str) == 0)
 		{
+			free(str);
 			return (uintptr_t)module.DllBase;
 		}
 
+		exit:
+		free(str);
 		read_virtual_memory((uintptr_t)flink.Flink, (uintptr_t*)&flink, sizeof(LIST_ENTRY), dtb);
 	}
 

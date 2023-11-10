@@ -141,9 +141,17 @@ namespace rwptm
 	template <typename T>
 	T read_virtual_memory(uintptr_t address)
 	{
-		T out;
+		T out{};
+
+		// address sanity check
+		if (address > 0x7FFFFFFFFFFF || address <= 0)
+			return out;
 
 		unsigned short orig_pml4e_ind = (unsigned short)((address >> 39) & 0x1FF);
+
+		// reading invalid addr
+		if (cached_pml4.find(orig_pml4e_ind) == cached_pml4.end())
+			return out;
 
 		uint64_t created_pml4e_ind = create_pml4e(cached_pml4[orig_pml4e_ind].Value);
 		uintptr_t fixed_addr = swap_pml4e_from_va(created_pml4e_ind, address);
@@ -162,7 +170,16 @@ namespace rwptm
 	template <typename T>
 	void write_virtual_memory(uintptr_t address, T val)
 	{
+		// address sanity check
+		if (address > 0x7FFFFFFFFFFF || address <= 0)
+			return;
+
 		unsigned short orig_pml4e_ind = (unsigned short)((address >> 39) & 0x1FF);
+
+		// writing invalid addr
+		if (cached_pml4.find(orig_pml4e_ind) == cached_pml4.end())
+			return;
+
 		uint64_t created_pml4e_ind = create_pml4e(cached_pml4[orig_pml4e_ind].Value);
 		uintptr_t fixed_addr = swap_pml4e_from_va(created_pml4e_ind, address);
 		MemoryFence();

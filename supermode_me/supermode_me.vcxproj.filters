@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="cs2">
+      <UniqueIdentifier>{8474adfc-8d0a-433b-91da-18113e283721}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="supermode.cpp">
@@ -37,6 +40,15 @@
     </ClInclude>
     <ClInclude Include="..\settings.h">
       <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="entity.h">
+      <Filter>cs2</Filter>
+    </ClInclude>
+    <ClInclude Include="vec3.h">
+      <Filter>cs2</Filter>
+    </ClInclude>
+    <ClInclude Include="offsets.h">
+      <Filter>cs2</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
