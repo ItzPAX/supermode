@@ -68,16 +68,26 @@ void cheat_thread()
 	std::cout << "csid: " << csid << std::endl;
 
 	entity local_player{};
-	std::vector<entity> entity_list;
+	std::vector<entity*> entity_list;
 
-	uintptr_t client;
+	uintptr_t client, engine;
 
 	client = supermode::get_module_base(L"client.dll", rwptm::target_eproc, rwptm::target_cr3);
 	std::cout << "clientdll: " << client << std::endl;
 
+	engine = supermode::get_module_base(L"engine2.dll", rwptm::target_eproc, rwptm::target_cr3);
+	std::cout << "clientdll: " << client << std::endl;
+
 	while (true)
 	{
-		entity_list.clear();
+		uintptr_t gameclient = rwptm::read_virtual_memory<uintptr_t>(engine + engine2_dll::dwNetworkGameClient);
+		int max_clients = rwptm::read_virtual_memory<int>(gameclient + engine2_dll::dwNetworkGameClient_maxClients);
+
+		if (max_clients <= 1)
+		{
+			Sleep(500);
+			continue;
+		}
 
 		local_player.address = rwptm::read_virtual_memory<uintptr_t>(client + client_dll::dwLocalPlayerPawn);
 		if (!local_player.address)
