@@ -68,7 +68,7 @@ void cheat_thread()
 	std::cout << "csid: " << csid << std::endl;
 
 	entity local_player{};
-	std::vector<entity*> entity_list;
+	std::vector<entity*> players;
 
 	uintptr_t client, engine;
 
@@ -94,13 +94,34 @@ void cheat_thread()
 		{
 			continue;
 		}
-
-		update_entity(&local_player);
-
+		
 		cls();
+		const auto entity_list = rwptm::read_virtual_memory<uintptr_t>(client + client_dll::dwEntityList);
+		for (auto i = 1; i < 64; i++) {
+			uintptr_t list_entry = rwptm::read_virtual_memory<uintptr_t>(entity_list + (8 * (i & 0x7FFF) >> 9) + 16);
+			uintptr_t cplayer = rwptm::read_virtual_memory<uintptr_t>(list_entry + 120 * (i & 0x1FF));
 
-		std::cout << "health: " << std::dec << local_player.health << std::endl;
-		std::cout << "pos x: " << std::dec << local_player.position.x << " pos y: " << local_player.position.y << " pos z: " << local_player.position.z << std::endl;
+			if (cplayer == 0)
+				continue;
+
+			const std::uint32_t player_pawn = rwptm::read_virtual_memory<std::uint32_t>(cplayer + player::m_hPlayerPawn);
+			const uintptr_t list_entry2 = rwptm::read_virtual_memory<uintptr_t>(entity_list + 0x8 * ((player_pawn & 0x7FFF) >> 9) + 16);
+			if (!list_entry2) 
+				continue;
+
+			entity ent;
+			ent.address = rwptm::read_virtual_memory<uintptr_t>(list_entry2 + 120 * (player_pawn & 0x1FF));
+
+			if (ent.address == local_player.address)
+				continue;
+
+			std::cout << "p: " << ent.address << std::endl;
+
+			update_entity(&ent);
+			
+			std::cout << "health: " << std::dec << ent.health << std::endl;
+			std::cout << "pos x: " << std::dec << ent.position.x << " pos y: " << ent.position.y << " pos z: " << ent.position.z << std::endl;
+		}
 
 		Sleep(1);
 	}

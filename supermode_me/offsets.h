@@ -44,4 +44,5 @@ namespace inputsystem_dll { // inputsystem.dll
 namespace player {
     constexpr std::ptrdiff_t iHealth = 0x32c;
     constexpr std::ptrdiff_t vOrigin = 0x1224;
+    constexpr std::ptrdiff_t m_hPlayerPawn = 0x7BC;
 }
