@@ -260,13 +260,7 @@ namespace supermode_comm
 		uint64_t va = generate_virtual_address(mal_pml4_pte_ind[PML4], mal_pml4_pte_ind[PDPT], mal_pml4_pte_ind[PD], mal_pml4_pte_ind[PT], pml4e_ind * sizeof(PPML4E));
 
 		PML4E pml4;
-		unsigned int randValue = static_cast<unsigned int>(rand());
-
-		pml4.Value |= static_cast<ULONG64>(randValue);
-		pml4.Value |= static_cast<ULONG64>(randValue) << 16;
-		pml4.Value |= static_cast<ULONG64>(randValue) << 32;
-		pml4.Value |= static_cast<ULONG64>(randValue) << 48;
-		pml4.Present = 0;
+		pml4.Value = 0;
 
 		memcpy((void*)va, &pml4, sizeof(PML4E));
 	}

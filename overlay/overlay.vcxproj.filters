@@ -13,48 +13,33 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="cs2">
-      <UniqueIdentifier>{8474adfc-8d0a-433b-91da-18113e283721}</UniqueIdentifier>
+    <Filter Include="overlay">
+      <UniqueIdentifier>{89b2e18c-a820-4c61-9b9f-b4cfaeed935f}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="supermode.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="dllmain.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="supermode_comm.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="json.hpp">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="supermode.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="rwptm.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="..\settings.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="entity.h">
-      <Filter>cs2</Filter>
-    </ClInclude>
-    <ClInclude Include="vec.h">
-      <Filter>cs2</Filter>
-    </ClInclude>
-    <ClInclude Include="offsets.h">
-      <Filter>cs2</Filter>
-    </ClInclude>
     <ClInclude Include="communication.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="utils.h">
-      <Filter>cs2</Filter>
+    <ClInclude Include="vec.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="overlay.h">
+      <Filter>overlay</Filter>
+    </ClInclude>
+    <ClInclude Include="inc.h">
+      <Filter>overlay</Filter>
+    </ClInclude>
+    <ClInclude Include="menu.h">
+      <Filter>overlay</Filter>
+    </ClInclude>
+    <ClInclude Include="render.h">
+      <Filter>overlay</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

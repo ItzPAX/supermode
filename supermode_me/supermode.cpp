@@ -397,7 +397,7 @@ uintptr_t supermode::get_module_base(const wchar_t* module_name, uintptr_t kproc
 			goto exit;
 
 		memset(str, 0, module.BaseDllName.Length + 2);
-		
+
 		if (!read_virtual_memory((uintptr_t)module.BaseDllName.Buffer, (uint64_t*)str, module.BaseDllName.Length, dtb))
 			goto exit;
 
@@ -407,7 +407,7 @@ uintptr_t supermode::get_module_base(const wchar_t* module_name, uintptr_t kproc
 			return (uintptr_t)module.DllBase;
 		}
 
-		exit:
+	exit:
 		free(str);
 		read_virtual_memory((uintptr_t)flink.Flink, (uintptr_t*)&flink, sizeof(LIST_ENTRY), dtb);
 	}
