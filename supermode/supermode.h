@@ -172,29 +172,25 @@ namespace supermode
 		return (uintptr_t)hi_va_start;
 	}
 
-	void avl_iterate_over(VAD_NODE* node, uintptr_t dtb)
+	void avl_iterate_over(VAD_NODE node, uintptr_t dtb)
 	{
-		if (node == nullptr) {
-			return;
-		}
+		DWORD64 start_va_adjusted = get_adjusted_va(TRUE, node);
+		DWORD64 end_va_adjusted = get_adjusted_va(FALSE, node);
 
-		DWORD64 start_va_adjusted = get_adjusted_va(TRUE, *node);
-		DWORD64 end_va_adjusted = get_adjusted_va(FALSE, *node);
-
-		std::cout << "VAD Entry at: 0x" << std::hex << node << " start: " << std::hex << start_va_adjusted << " end : " << end_va_adjusted << std::endl;
+		std::cout << "VAD Entry at: 0x" << std::hex << &node << " start: " << std::hex << start_va_adjusted << " end : " << end_va_adjusted << std::endl;
 		forbidden_zones.push_back({ start_va_adjusted, end_va_adjusted });
 
-		if (node->Left != nullptr) {
-			VAD_NODE leftNode;
-			if (wnbios.read_virtual_memory((uintptr_t)node->Left, (uint64_t*)&leftNode, sizeof(VAD_NODE), dtb)) {
-				avl_iterate_over(&leftNode, dtb);
+		if (node.Left != nullptr) {
+			VAD_NODE leftNode{};
+			if (wnbios.read_virtual_memory((uintptr_t)node.Left, (uint64_t*)&leftNode, sizeof(VAD_NODE), dtb)) {
+				avl_iterate_over(leftNode, dtb);
 			}
 		}
 
-		if (node->Right != nullptr) {
-			VAD_NODE rightNode;
-			if (wnbios.read_virtual_memory((uintptr_t)node->Right, (uint64_t*)&rightNode, sizeof(VAD_NODE), dtb)) {
-				avl_iterate_over(&rightNode, dtb);
+		if (node.Right != nullptr) {
+			VAD_NODE rightNode{};
+			if (wnbios.read_virtual_memory((uintptr_t)node.Right, (uint64_t*)&rightNode, sizeof(VAD_NODE), dtb)) {
+				avl_iterate_over(rightNode, dtb);
 			}
 		}
 	}
@@ -211,7 +207,7 @@ namespace supermode
 		if (!wnbios.read_virtual_memory((uintptr_t)lpVadRoot, (uint64_t*)&vad, sizeof(VAD_NODE), dtb))
 			return;
 
-		avl_iterate_over(&vad, dtb);
+		avl_iterate_over(vad, dtb);
 		std::cout << "added " << forbidden_zones.size() << " forbidden zones\n";
 	}
 

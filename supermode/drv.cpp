@@ -1,29 +1,5 @@
 #include "drv.h"
 
-typedef struct _PML4E
-{
-	union
-	{
-		struct
-		{
-			ULONG64 Present : 1;              // Must be 1, region invalid if 0.
-			ULONG64 ReadWrite : 1;            // If 0, writes not allowed.
-			ULONG64 UserSupervisor : 1;       // If 0, user-mode accesses not allowed.
-			ULONG64 PageWriteThrough : 1;     // Determines the memory type used to access PDPT.
-			ULONG64 PageCacheDisable : 1;     // Determines the memory type used to access PDPT.
-			ULONG64 Accessed : 1;             // If 0, this entry has not been used for translation.
-			ULONG64 Ignored1 : 1;
-			ULONG64 PageSize : 1;             // Must be 0 for PML4E.
-			ULONG64 Ignored2 : 4;
-			ULONG64 PageFrameNumber : 36;     // The page frame number of the PDPT of this PML4E.
-			ULONG64 Reserved : 4;
-			ULONG64 Ignored3 : 11;
-			ULONG64 ExecuteDisable : 1;       // If 1, instruction fetches not allowed.
-		};
-		ULONG64 Value;
-	};
-} PML4E, * PPML4E;
-
 bool wnbios_lib::to_file()
 {
 	if (std::filesystem::exists(store_at + drv_name))
@@ -332,8 +308,8 @@ uint32_t wnbios_lib::find_self_referencing_pml4e()
 	// find a valid entry
 	for (int i = 1; i < 512; i++)
 	{
-		PML4E pml4e;
-		if (!read_physical_memory((dirbase + i * sizeof(uintptr_t)), &pml4e, sizeof(PML4E)))
+		driver::PML4E pml4e;
+		if (!read_physical_memory((dirbase + i * sizeof(uintptr_t)), &pml4e, sizeof(driver::PML4E)))
 		{
 			return 0;
 		}
@@ -556,7 +532,7 @@ uintptr_t wnbios_lib::find_dtb_from_base(uintptr_t base)
 		if (i % 0x100000 == 0)
 			printf("reached dtb: 0x%p\n", dtb);
 
-		PML4E PML4E;
+		driver::PML4E PML4E;
 		if (!read_physical_memory((dtb + self_ref_entry * sizeof(uintptr_t)), &PML4E, sizeof(PML4E)))
 			continue;
 
@@ -609,44 +585,44 @@ uintptr_t wnbios_lib::convert_virtual_to_physical(uintptr_t virtual_address, uin
 	uintptr_t va = virtual_address;
 
 	unsigned short PML4 = (unsigned short)((va >> 39) & 0x1FF);
-	uintptr_t PML4E = 0;
+	driver::PML4E PML4E{};
 	read_physical_memory((dtb + PML4 * sizeof(uintptr_t)), &PML4E, sizeof(PML4E));
 
-	if (PML4E == 0)
+	if (PML4E.Present == 0)
 		return 0;
 
 	unsigned short DirectoryPtr = (unsigned short)((va >> 30) & 0x1FF);
-	uintptr_t PDPTE = 0;
-	read_physical_memory(((PML4E & 0xFFFFFFFFFF000) + DirectoryPtr * sizeof(uintptr_t)), &PDPTE, sizeof(PDPTE));
+	driver::PDPTE PDPTE{};
+	read_physical_memory(((PML4E.Value & 0xFFFFFFFFFF000) + DirectoryPtr * sizeof(uintptr_t)), &PDPTE, sizeof(PDPTE));
 
-	if (PDPTE == 0)
+	if (PDPTE.Present == 0)
 		return 0;
 
-	if ((PDPTE & (1 << 7)) != 0)
-		return (PDPTE & 0xFFFFFC0000000) + (va & 0x3FFFFFFF);
+	if (PDPTE.PageSize != 0)
+		return (PDPTE.Value & 0xFFFFFC0000000) + (va & 0x3FFFFFFF);
 
 	unsigned short Directory = (unsigned short)((va >> 21) & 0x1FF);
 
-	uintptr_t PDE = 0;
-	read_physical_memory(((PDPTE & 0xFFFFFFFFFF000) + Directory * sizeof(uintptr_t)), &PDE, sizeof(PDE));
+	driver::PDE PDE{};
+	read_physical_memory(((PDPTE.Value & 0xFFFFFFFFFF000) + Directory * sizeof(uintptr_t)), &PDE, sizeof(PDE));
 
-	if (PDE == 0)
+	if (PDE.Present == 0)
 		return 0;
 
-	if ((PDE & (1 << 7)) != 0)
+	if (PDE.PageSize != 0)
 	{
-		return (PDE & 0xFFFFFFFE00000) + (va & 0x1FFFFF);
+		return (PDE.Value & 0xFFFFFFFE00000) + (va & 0x1FFFFF);
 	}
 
 	unsigned short Table = (unsigned short)((va >> 12) & 0x1FF);
-	uintptr_t PTE = 0;
+	driver::PTE PTE{};
 
-	read_physical_memory(((PDE & 0xFFFFFFFFFF000) + Table * sizeof(uintptr_t)), &PTE, sizeof(PTE));
+	read_physical_memory(((PDE.Value & 0xFFFFFFFFFF000) + Table * sizeof(uintptr_t)), &PTE, sizeof(PTE));
 
-	if (PTE == 0)
+	if (PTE.Present == 0)
 		return 0;
 
-	return (PTE & 0xFFFFFFFFFF000) + (va & 0xFFF);
+	return (PTE.Value & 0xFFFFFFFFFF000) + (va & 0xFFF);
 }
 
 bool wnbios_lib::read_virtual_memory(uintptr_t address, LPVOID output, unsigned long size, uintptr_t dtb)
