@@ -333,7 +333,7 @@ namespace supermode
 		}
 	}
 
-	void free_pte(uint64_t ptstruct, uint64_t* ptind)
+	void free_pte(uint64_t ptstruct, uint64_t* ptind, bool must_be_first = false)
 	{
 		if (!wnbios.attached_proc || !wnbios.cr3)
 		{
@@ -463,6 +463,8 @@ namespace supermode
 		uintptr_t mal_pte_phys = mal_pte_struct[PT] + mal_pte_ind[PT] * sizeof(uintptr_t);
 		mal_pte_pfn = calc_pfnpte_from_addr(mal_pte_phys);
 
+		std::cout << "Offset: " << mal_pte_pfn.offset << std::endl;
+
 		wnbios.write_physical_memory(mal_pte_phys, &mal_pte, sizeof(PTE));
 		std::cout << "inserted first malicious pte at index " << mal_pte_ind[PT] << " [" << std::hex << mal_pte_phys << "] " << std::dec << std::endl;
 	}
@@ -577,6 +579,7 @@ namespace supermode
 
 		j["cr3"] = wnbios.get_system_dirbase();
 		j["target_cr3"] = target_cr3;
+		j["mal_pte_offset"] = mal_pte_pfn.offset;
 
 		std::ofstream out_file("C:\\indices.json");
 		out_file << j.dump();

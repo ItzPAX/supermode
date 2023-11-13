@@ -122,6 +122,8 @@ namespace supermode_comm
 	static uint64_t system_cr3;
 	static uint64_t target_cr3;
 
+	static uint64_t mal_pte_offset = 0;
+
 	static uint64_t current_pfn = 0;
 
 	static std::vector<uint64_t> free_pml4s;
@@ -131,7 +133,6 @@ namespace supermode_comm
 		uint64_t pfn;
 		uint64_t offset;
 	};
-	static PTE_PFN mal_pte_pfn;
 	
 	// rudamentary ahhhh data transmition
 	static bool load()
@@ -148,8 +149,11 @@ namespace supermode_comm
 		system_cr3 = j["cr3"].get<uint64_t>();
 		std::cout << "system_cr3: 0x" << std::hex << system_cr3 << std::dec << std::endl;
 
-		target_cr3 = j["target_cr3"].get<uintptr_t>();
+		target_cr3 = j["target_cr3"].get<uint64_t>();
 		std::cout << "target_cr3: 0x" << std::hex << target_cr3 << std::dec << std::endl;
+
+		mal_pte_offset = j["mal_pte_offset"].get<uint64_t>();
+		std::cout << "mal_pte_offset: 0x" << std::hex << mal_pte_offset << std::dec << std::endl;
 
 		for (int i = 0; i <= PT; i++)
 		{
@@ -217,7 +221,7 @@ namespace supermode_comm
 	{
 		current_pfn = pfn;
 
-		uint64_t va = generate_virtual_address(mal_pointer_pte_ind[PML4], mal_pointer_pte_ind[PDPT], mal_pointer_pte_ind[PD], mal_pointer_pte_ind[PT], 0);
+		uint64_t va = generate_virtual_address(mal_pointer_pte_ind[PML4], mal_pointer_pte_ind[PDPT], mal_pointer_pte_ind[PD], mal_pointer_pte_ind[PT], mal_pte_offset);
 
 		PTE mal_pte;
 		mal_pte.Value = 0;
