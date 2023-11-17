@@ -214,13 +214,14 @@ uintptr_t supermode::attach(const char* image_name, uintptr_t* out_cr3, uintptr_
 
 	printf("system_kprocess: %llx\n", kprocess_initial);
 
-	const unsigned long limit = 400;
-
 	uintptr_t link_start = kprocess_initial + EP_ACTIVEPROCESSLINK;
 	uintptr_t flink = link_start;
 	uintptr_t image_base_out = 0;
 
-	for (int a = 0; a < limit; a++)
+	bool first = true;
+	DWORD start_pid = -1;
+
+	for (;;)
 	{
 		read_virtual_memory(flink, (uintptr_t*)&flink, sizeof(PVOID), supermode_comm::system_cr3);
 
@@ -238,6 +239,17 @@ uintptr_t supermode::attach(const char* image_name, uintptr_t* out_cr3, uintptr_
 		int process_id = 0;
 		memcpy(&process_id, &kproc_buf[EP_UNIQUEPROCESSID], sizeof(int));
 
+		if (first)
+		{
+			first = false;
+			start_pid = process_id;
+		}
+		else
+		{
+			if (process_id == start_pid)
+				break;
+		}
+
 		char name[16] = { };
 		memcpy((uintptr_t*) & name, &kproc_buf[EP_IMAGEFILENAME], sizeof(name));
 
@@ -250,6 +262,7 @@ uintptr_t supermode::attach(const char* image_name, uintptr_t* out_cr3, uintptr_
 			uintptr_t base_address;
 			memcpy(&base_address, &kproc_buf[EP_SECTIONBASE], sizeof(uintptr_t));
 
+			printf("process_name: %s\n", image_name);
 			printf("process_id: %i\n", process_id);
 			printf("process_base: %llx\n", base_address);
 			printf("process_cr3: %llx\n", directory_table);
