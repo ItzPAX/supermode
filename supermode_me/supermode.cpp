@@ -420,72 +420,46 @@ uintptr_t supermode::convert_virtual_to_physical(uintptr_t virtual_address, uint
 	if (cr3 == USE_PROCESS_CR3)
 		cr3 = attached_cr3;
 
-	uintptr_t va = virtual_address;
+	uintptr_t directoryTableBase = cr3 & ~0xf;
 
-	if (tlb[cr3][va] != 0)
-		return tlb[cr3][va];
+	UINT64 pageOffset = virtual_address & ~(~0ul << PAGE_OFFSET_SIZE);
+	UINT64 pte = ((virtual_address >> 12) & (0x1ffll));
+	UINT64 pt = ((virtual_address >> 21) & (0x1ffll));
+	UINT64 pd = ((virtual_address >> 30) & (0x1ffll));
+	UINT64 pdp = ((virtual_address >> 39) & (0x1ffll));
 
-	unsigned short PML4 = (unsigned short)((va >> 39) & 0x1FF);
-	supermode_comm::PML4E PML4E;
-
-	if (!supermode_comm::read_physical_memory((cr3 + PML4 * sizeof(uintptr_t)), sizeof(PML4E), (uintptr_t*)&PML4E))
+	SIZE_T readsize = 0;
+	UINT64 pdpe = 0;
+	supermode_comm::read_physical_memory((directoryTableBase + 8 * pdp), sizeof(pdpe), &pdpe);
+	if (~pdpe & 1)
 		return 0;
 
-	if (PML4E.Present == 0 || PML4E.Reserved != 0)
-	{
-		return 0;
-	}
-
-	unsigned short DirectoryPtr = (unsigned short)((va >> 30) & 0x1FF);
-
-	supermode_comm::PDPTE PDPTE;
-	
-	if (!supermode_comm::read_physical_memory(((PML4E.Value & 0xFFFFFFFFFF000) + DirectoryPtr * sizeof(uintptr_t)), sizeof(PDPTE), (uintptr_t*)&PDPTE))
+	UINT64 pde = 0;
+	supermode_comm::read_physical_memory(((pdpe & PMASK) + 8 * pd), sizeof(pde), &pde);
+	if (~pde & 1)
 		return 0;
 
-	if (PDPTE.Present == 0 || PDPTE.Reserved != 0)
-	{
-		return 0;
-	}
+	/* 1GB large page, use pde's 12-34 bits */
+	if (pde & 0x80)
+		return (pde & (~0ull << 42 >> 12)) + (virtual_address & ~(~0ull << 30));
 
-	if (PDPTE.PageSize != 0)
-	{
-		tlb[cr3][va] = (PDPTE.Value & 0xFFFFFC0000000) + (va & 0x3FFFFFFF);
-		return (PDPTE.Value & 0xFFFFFC0000000) + (va & 0x3FFFFFFF);
-	}
-
-	unsigned short Directory = (unsigned short)((va >> 21) & 0x1FF);
-
-	supermode_comm::PDE PDE;
-
-	if (!supermode_comm::read_physical_memory(((PDPTE.Value & 0xFFFFFFFFFF000) + Directory * sizeof(uintptr_t)), sizeof(PDE), (uintptr_t*)&PDE))
+	UINT64 pteAddr = 0;
+	supermode_comm::read_physical_memory(((pde & PMASK) + 8 * pt), sizeof(pteAddr), &pteAddr);
+	if (~pteAddr & 1)
 		return 0;
 
-	if (PDE.Present == 0 || PDE.Reserved != 0)
-	{
-		return 0;
-	}
+	/* 2MB large page */
+	if (pteAddr & 0x80)
+		return (pteAddr & PMASK) + (virtual_address & ~(~0ull << 21));
 
-	if (PDE.PageSize != 0)
-	{
-		tlb[cr3][va] = (PDE.Value & 0xFFFFFFFE00000) + (va & 0x1FFFFF);
-		return (PDE.Value & 0xFFFFFFFE00000) + (va & 0x1FFFFF);
-	}
+	virtual_address = 0;
+	supermode_comm::read_physical_memory(((pteAddr & PMASK) + 8 * pte), sizeof(virtual_address), &virtual_address);
+	virtual_address &= PMASK;
 
-	unsigned short Table = (unsigned short)((va >> 12) & 0x1FF);
-
-	supermode_comm::PTE PTE;
-
-	if (!supermode_comm::read_physical_memory(((PDE.Value & 0xFFFFFFFFFF000) + Table * sizeof(uintptr_t)), sizeof(PTE), (uintptr_t*)&PTE))
+	if (!virtual_address)
 		return 0;
 
-	if (PTE.Present == 0 || PTE.Reserved != 0)
-	{
-		return 0;
-	}
-
-	tlb[cr3][va] = (PTE.Value & 0xFFFFFFFFFF000) + (va & 0xFFF);
-	return (PTE.Value & 0xFFFFFFFFFF000) + (va & 0xFFF);
+	return virtual_address + pageOffset;
 }
 
 uint32_t supermode::find_self_referencing_pml4e()

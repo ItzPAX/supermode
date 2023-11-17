@@ -2,12 +2,12 @@
 
 bool wnbios_lib::to_file()
 {
-	if (std::filesystem::exists(store_at + drv_name))
+	if (std::filesystem::exists(store_at + '\\' + drv_name))
 		return 1;
 
 	std::filesystem::create_directories(store_at);
 
-	std::ofstream out_driver(store_at + drv_name, std::ios::beg | std::ios::binary);
+	std::ofstream out_driver(store_at + '\\' + drv_name, std::ios::beg | std::ios::binary);
 	if (!out_driver.is_open())
 		return 0;
 
@@ -437,9 +437,9 @@ uintptr_t wnbios_lib::get_process_base(const char* image_name)
 
 		if (strstr(image_name, name) && process_id == get_process_id(image_name))
 		{
-			//printf("process_id: %i\n", process_id);
-			//printf("process_base: %llx\n", base_address);
-			//printf("process_cr3: %llx\n", directory_table);
+			printf("process_id: %i\n", process_id);
+			printf("process_base: %llx\n", base_address);
+			printf("process_cr3: %llx\n", directory_table);
 
 			image_base_out = base_address;
 			cr3 = directory_table;
@@ -582,47 +582,46 @@ uintptr_t wnbios_lib::convert_virtual_to_physical(uintptr_t virtual_address, uin
 	if (dtb == -1)
 		dtb = cr3;
 
-	uintptr_t va = virtual_address;
+	uintptr_t directoryTableBase = dtb & ~0xf;
 
-	unsigned short PML4 = (unsigned short)((va >> 39) & 0x1FF);
-	driver::PML4E PML4E{};
-	read_physical_memory((dtb + PML4 * sizeof(uintptr_t)), &PML4E, sizeof(PML4E));
+	UINT64 pageOffset = virtual_address & ~(~0ul << PAGE_OFFSET_SIZE);
+	UINT64 pte = ((virtual_address >> 12) & (0x1ffll));
+	UINT64 pt = ((virtual_address >> 21) & (0x1ffll));
+	UINT64 pd = ((virtual_address >> 30) & (0x1ffll));
+	UINT64 pdp = ((virtual_address >> 39) & (0x1ffll));
 
-	if (PML4E.Present == 0)
+	SIZE_T readsize = 0;
+	UINT64 pdpe = 0;
+	read_physical_memory((directoryTableBase + 8 * pdp), &pdpe, sizeof(pdpe));
+	if (~pdpe & 1)
 		return 0;
 
-	unsigned short DirectoryPtr = (unsigned short)((va >> 30) & 0x1FF);
-	driver::PDPTE PDPTE{};
-	read_physical_memory(((PML4E.Value & 0xFFFFFFFFFF000) + DirectoryPtr * sizeof(uintptr_t)), &PDPTE, sizeof(PDPTE));
-
-	if (PDPTE.Present == 0)
+	UINT64 pde = 0;
+	read_physical_memory(((pdpe & PMASK) + 8 * pd), &pde, sizeof(pde));
+	if (~pde & 1)
 		return 0;
 
-	if (PDPTE.PageSize != 0)
-		return (PDPTE.Value & 0xFFFFFC0000000) + (va & 0x3FFFFFFF);
+	/* 1GB large page, use pde's 12-34 bits */
+	if (pde & 0x80)
+		return (pde & (~0ull << 42 >> 12)) + (virtual_address & ~(~0ull << 30));
 
-	unsigned short Directory = (unsigned short)((va >> 21) & 0x1FF);
-
-	driver::PDE PDE{};
-	read_physical_memory(((PDPTE.Value & 0xFFFFFFFFFF000) + Directory * sizeof(uintptr_t)), &PDE, sizeof(PDE));
-
-	if (PDE.Present == 0)
+	UINT64 pteAddr = 0;
+	read_physical_memory(((pde & PMASK) + 8 * pt), &pteAddr, sizeof(pteAddr));
+	if (~pteAddr & 1)
 		return 0;
 
-	if (PDE.PageSize != 0)
-	{
-		return (PDE.Value & 0xFFFFFFFE00000) + (va & 0x1FFFFF);
-	}
+	/* 2MB large page */
+	if (pteAddr & 0x80)
+		return (pteAddr & PMASK) + (virtual_address & ~(~0ull << 21));
 
-	unsigned short Table = (unsigned short)((va >> 12) & 0x1FF);
-	driver::PTE PTE{};
+	virtual_address = 0;
+	read_physical_memory(((pteAddr & PMASK) + 8 * pte), &virtual_address, sizeof(virtual_address));
+	virtual_address &= PMASK;
 
-	read_physical_memory(((PDE.Value & 0xFFFFFFFFFF000) + Table * sizeof(uintptr_t)), &PTE, sizeof(PTE));
-
-	if (PTE.Present == 0)
+	if (!virtual_address)
 		return 0;
 
-	return (PTE.Value & 0xFFFFFFFFFF000) + (va & 0xFFF);
+	return virtual_address + pageOffset;
 }
 
 bool wnbios_lib::read_virtual_memory(uintptr_t address, LPVOID output, unsigned long size, uintptr_t dtb)

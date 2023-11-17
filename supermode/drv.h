@@ -1619,6 +1619,10 @@ struct wnbios_mem
 
 class wnbios_lib {
 private:
+#define PAGE_OFFSET_SIZE 12
+	static const UINT64 PMASK = (~0xfull << 8) & 0xfffffffffull;
+
+
 #define IOCTL_MAP 0x80102040
 #define IOCTL_UMAP 0x80102044
 
