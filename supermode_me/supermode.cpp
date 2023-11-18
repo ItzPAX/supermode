@@ -381,6 +381,7 @@ bool supermode::write_virtual_memory(uintptr_t address, uint64_t* data, unsigned
 
 uintptr_t supermode::get_module_base(const wchar_t* module_name, uintptr_t kprocess, uintptr_t dtb)
 {
+	dtb &= ~0xf;
 	std::wcout << L"getting " << module_name << " using eproc: " << kprocess << " and dtb " << dtb << std::endl;
 
 	get_eprocess_offsets();

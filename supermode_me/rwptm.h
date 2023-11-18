@@ -36,6 +36,8 @@ namespace rwptm
 	// populates internal pml4 cache you should call this when attached to the target pocess
 	void populate_cached_pml4(uintptr_t cr3)
 	{
+		cr3 &= ~0xf;
+
 		std::cout << "Copying PML4 of target process to local cache\n";
 		if (cr3 == 0)
 		{
@@ -62,6 +64,8 @@ namespace rwptm
 	// get free local pml4e to create target pml4e in
 	void setup_pml4_table(uintptr_t cr3)
 	{
+		cr3 &= ~0xf;
+
 		std::cout << "Copying PML4 of target process to local pml4\n";
 		if (cr3 == 0)
 		{
@@ -147,7 +151,10 @@ namespace rwptm
 
 		// reading invalid addr
 		if (cached_pml4.find(orig_pml4e_ind) == cached_pml4.end())
+		{
+			std::cout << "couldnt find pml4e\n";
 			return out;
+		}
 
 		uint64_t created_pml4e_ind = create_pml4e(cached_pml4[orig_pml4e_ind].Value);
 		uintptr_t fixed_addr = swap_pml4e_from_va(created_pml4e_ind, address);

@@ -38,13 +38,13 @@ int start_sm(int argc, char* argv[])
 
 void update_entity(entity* pent)
 {
-	pent->origin = rwptm::read_virtual_memory<vec3>(pent->address + player::vOrigin);
+	pent->origin = rwptm::read_virtual_memory<vec3>(pent->address + player::m_vOldOrigin);
 
-	uintptr_t gamescene = rwptm::read_virtual_memory<uintptr_t>(pent->address + player::dwGameScene);
-	uintptr_t bonearray = rwptm::read_virtual_memory<uintptr_t>(gamescene + player::dwBoneArray1 + player::dwBoneArray2);
+	uintptr_t gamescene = rwptm::read_virtual_memory<uintptr_t>(pent->address + player::m_pGameSceneNode);
+	uintptr_t bonearray = rwptm::read_virtual_memory<uintptr_t>(gamescene + player::m_modelState + player::m_vecOrigin);
 	pent->head = rwptm::read_virtual_memory<vec3>(bonearray + 6 * 32);
-
-	pent->health = rwptm::read_virtual_memory<int>(pent->address + player::iHealth);
+	pent->team = rwptm::read_virtual_memory<int>(pent->address + player::m_iTeamNum);
+	pent->health = rwptm::read_virtual_memory<int>(pent->address + player::m_iHealth);
 }
 
 void cheat_thread()
@@ -77,6 +77,7 @@ void cheat_thread()
 		
 		if (max_clients <= 1)
 		{
+			std::cout << "not enough max clients... " << max_clients << std::endl;
 			Sleep(500);
 			continue;
 		}
@@ -89,6 +90,8 @@ void cheat_thread()
 			continue;
 		}
 		
+		int localteam = rwptm::read_virtual_memory<int>(local_player.address + player::m_iTeamNum);
+
 		const auto entity_list = rwptm::read_virtual_memory<uintptr_t>(client + client_dll::dwEntityList);
 
 		for (auto i = 1; i < 64; i++) 
@@ -99,7 +102,7 @@ void cheat_thread()
 			if (cplayer == 0)
 				continue;
 		
-			const std::uint32_t player_pawn = rwptm::read_virtual_memory<std::uint32_t>(cplayer + player::hPlayerPawn);
+			const std::uint32_t player_pawn = rwptm::read_virtual_memory<std::uint32_t>(cplayer + player::m_hPlayerPawn);
 			const uintptr_t list_entry2 = rwptm::read_virtual_memory<uintptr_t>(entity_list + 0x8 * ((player_pawn & 0x7FFF) >> 9) + 16);
 			if (!list_entry2) 
 				continue;
@@ -114,7 +117,10 @@ void cheat_thread()
 		
 			if (ent.health > 100 || ent.health < 1)
 				continue;
-		
+			
+			if (ent.team == localteam)
+				continue;
+
 			vec3 w2s_origin{};
 			if (!world_to_screen(screensize, ent.origin, w2s_origin, vm))
 				continue;
