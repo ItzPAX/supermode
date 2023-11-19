@@ -36,15 +36,22 @@ int start_sm(int argc, char* argv[])
 	return 1;
 }
 
-void update_entity(entity* pent)
+bool update_entity(entity* pent)
 {
-	pent->origin = rwptm::read_virtual_memory<vec3>(pent->address + player::m_vOldOrigin);
-
 	uintptr_t gamescene = rwptm::read_virtual_memory<uintptr_t>(pent->address + player::m_pGameSceneNode);
+	if (!gamescene)
+		return false;
+
 	uintptr_t bonearray = rwptm::read_virtual_memory<uintptr_t>(gamescene + player::m_modelState + player::m_vecOrigin);
+	if (!bonearray)
+		return false;
+
 	pent->head = rwptm::read_virtual_memory<vec3>(bonearray + 6 * 32);
+	pent->origin = rwptm::read_virtual_memory<vec3>(pent->address + player::m_vOldOrigin);
 	pent->team = rwptm::read_virtual_memory<int>(pent->address + player::m_iTeamNum);
 	pent->health = rwptm::read_virtual_memory<int>(pent->address + player::m_iHealth);
+
+	return true;
 }
 
 void cheat_thread()
@@ -73,12 +80,27 @@ void cheat_thread()
 		comm::boxes.push_back(b);
 
 		uintptr_t gameclient = rwptm::read_virtual_memory<uintptr_t>(engine + engine2_dll::dwNetworkGameClient);
+		if (!gameclient)
+		{
+			std::cout << "gameclient not found" << std::endl;
+			Sleep(5000);
+			continue;
+		}
+
+		DWORD signon = rwptm::read_virtual_memory<DWORD>(gameclient + engine2_dll::dwNetworkGameClient_signOnState);
+		if (signon != 6)
+		{
+			std::cout << "signon invalid" << std::endl;
+			Sleep(5000);
+			continue;
+		}
+
 		int max_clients = rwptm::read_virtual_memory<int>(gameclient + engine2_dll::dwNetworkGameClient_maxClients);
 		
-		if (max_clients <= 1)
+		if (max_clients < 2 || max_clients > 64)
 		{
-			std::cout << "not enough max clients... " << max_clients << std::endl;
-			Sleep(500);
+			std::cout << "max clients not in bounds... " << max_clients << std::endl;
+			Sleep(5000);
 			continue;
 		}
 		
@@ -90,61 +112,77 @@ void cheat_thread()
 			continue;
 		}
 		
-		int localteam = rwptm::read_virtual_memory<int>(local_player.address + player::m_iTeamNum);
+		if (!update_entity(&local_player))
+			continue;
 
 		const auto entity_list = rwptm::read_virtual_memory<uintptr_t>(client + client_dll::dwEntityList);
 
 		for (auto i = 1; i < 64; i++) 
 		{
 			uintptr_t list_entry = rwptm::read_virtual_memory<uintptr_t>(entity_list + (8 * (i & 0x7FFF) >> 9) + 16);
+			if (!list_entry)
+				continue;
+
 			uintptr_t cplayer = rwptm::read_virtual_memory<uintptr_t>(list_entry + 120 * (i & 0x1FF));
-		
-			if (cplayer == 0)
+			if (!cplayer)
 				continue;
 		
 			const std::uint32_t player_pawn = rwptm::read_virtual_memory<std::uint32_t>(cplayer + player::m_hPlayerPawn);
+			if (!player_pawn)
+				continue;
+
 			const uintptr_t list_entry2 = rwptm::read_virtual_memory<uintptr_t>(entity_list + 0x8 * ((player_pawn & 0x7FFF) >> 9) + 16);
 			if (!list_entry2) 
 				continue;
 		
 			entity ent;
 			ent.address = rwptm::read_virtual_memory<uintptr_t>(list_entry2 + 120 * (player_pawn & 0x1FF));
-		
+			
+			if (!ent.address)
+				continue;
+
 			if (ent.address == local_player.address)
 				continue;
 		
-			update_entity(&ent);
-		
+			if (!update_entity(&ent))
+				continue;
+			
 			if (ent.health > 100 || ent.health < 1)
 				continue;
 			
-			if (ent.team == localteam)
+			if (ent.team != 2 && ent.team != 3)
 				continue;
 
+			if (ent.origin.is_null() || ent.head.is_null())
+				continue;
+
+			if (ent.team == local_player.team)
+				continue;
+			
 			vec3 w2s_origin{};
 			if (!world_to_screen(screensize, ent.origin, w2s_origin, vm))
 				continue;
-		
+			
 			vec3 w2s_head{};
 			if (!world_to_screen(screensize, ent.head, w2s_head, vm))
 				continue;
-		
+			
 			// make some shitty box
 			float height = w2s_origin.y - w2s_head.y;
 			float width = height / 2;
 			
 			int health_to_255 = ent.health * 2.55;
 			DWORD col = RGB(255 - health_to_255, health_to_255, 0);
-
+			
 			comm::box b;
 			b.xy = vec2{ w2s_origin.x - width / 2, w2s_head.y };
 			b.size = vec2{ width, height };
 			b.col = col;
 			comm::boxes.push_back(b);
 		}
-		
+
 		comm::write_draw_data();
-		
+
 		Sleep(1);
 	}
 }
