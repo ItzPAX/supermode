@@ -46,10 +46,10 @@ bool update_entity(entity* pent)
 	if (!bonearray)
 		return false;
 
+	pent->health = rwptm::read_virtual_memory<int>(pent->address + player::m_iHealth);
 	pent->head = rwptm::read_virtual_memory<vec3>(bonearray + 6 * 32);
 	pent->origin = rwptm::read_virtual_memory<vec3>(pent->address + player::m_vOldOrigin);
 	pent->team = rwptm::read_virtual_memory<int>(pent->address + player::m_iTeamNum);
-	pent->health = rwptm::read_virtual_memory<int>(pent->address + player::m_iHealth);
 
 	return true;
 }
@@ -112,10 +112,11 @@ void cheat_thread()
 			continue;
 		}
 		
-		if (!update_entity(&local_player))
-			continue;
+		//if (!update_entity(&local_player))
+		//	continue;
 
 		const auto entity_list = rwptm::read_virtual_memory<uintptr_t>(client + client_dll::dwEntityList);
+		static int local_player_team = 0;
 
 		for (auto i = 1; i < 64; i++) 
 		{
@@ -141,12 +142,15 @@ void cheat_thread()
 			if (!ent.address)
 				continue;
 
-			if (ent.address == local_player.address)
-				continue;
-		
 			if (!update_entity(&ent))
 				continue;
-			
+
+			if (ent.address == local_player.address)
+			{
+				local_player_team = ent.team;
+				continue;
+			}
+
 			if (ent.health > 100 || ent.health < 1)
 				continue;
 			
@@ -156,7 +160,7 @@ void cheat_thread()
 			if (ent.origin.is_null() || ent.head.is_null())
 				continue;
 
-			if (ent.team == local_player.team)
+			if (ent.team == local_player_team)
 				continue;
 			
 			vec3 w2s_origin{};

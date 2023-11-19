@@ -30,9 +30,12 @@ namespace overlay
             menu::render_info(dc);
             menu::render_features();
 
-            for (auto& box : boxes)
+            if (menu::esp)
             {
-                render::rectangle(box.xy.x, box.xy.y, box.size.x, box.size.y, box.col, true);
+                for (auto& box : boxes)
+                {
+                    render::rectangle(box.xy.x, box.xy.y, box.size.x, box.size.y, box.col, true);
+                }
             }
 
             EndPaint(hWnd, &ps);

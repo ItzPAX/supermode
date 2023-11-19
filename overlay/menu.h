@@ -3,6 +3,8 @@
 
 namespace menu
 {
+	static bool esp = 1;
+
 	enum mf_flag : DWORD
 	{
 		flag_none = 0x0,
@@ -175,7 +177,6 @@ namespace menu
 		m_idx++;
 	}
 
-	static bool esp;
 	void init()
 	{
 		element_bool("[ESP] Enabled", &esp);
