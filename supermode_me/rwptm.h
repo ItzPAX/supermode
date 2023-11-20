@@ -161,6 +161,12 @@ namespace rwptm
 
 		MemoryFence();
 
+		if (IsBadReadPtr((void*)fixed_addr, sizeof(T)))
+		{
+			destroy_pml4e(created_pml4e_ind);
+			return out;
+		}
+
 		memcpy(&out, (void*)fixed_addr, sizeof(T));
 
 		destroy_pml4e(created_pml4e_ind);
