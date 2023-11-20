@@ -57,5 +57,4 @@ namespace player {
     constexpr std::ptrdiff_t m_modelState = 0x160;
     constexpr std::ptrdiff_t m_vecOrigin = 0x80;
     constexpr std::ptrdiff_t m_iTeamNum = 0x3BF;
-    constexpr std::ptrdiff_t m_CBodyComponent = 0x30;
 }

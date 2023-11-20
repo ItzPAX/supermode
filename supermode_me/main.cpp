@@ -46,10 +46,6 @@ bool update_entity(entity* pent)
 	if (!bonearray)
 		return false;
 
-	uintptr_t body_component = rwptm::read_virtual_memory<uintptr_t>(gamescene + player::m_CBodyComponent);
-	if (!body_component)
-		return false;
-
 	pent->health = rwptm::read_virtual_memory<int>(pent->address + player::m_iHealth);
 	pent->head = rwptm::read_virtual_memory<vec3>(bonearray + 6 * 32);
 	pent->origin = rwptm::read_virtual_memory<vec3>(pent->address + player::m_vOldOrigin);
