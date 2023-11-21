@@ -152,7 +152,6 @@ namespace rwptm
 		// reading invalid addr
 		if (cached_pml4.find(orig_pml4e_ind) == cached_pml4.end())
 		{
-			std::cout << "couldnt find pml4e\n";
 			return out;
 		}
 
