@@ -115,6 +115,8 @@ namespace supermode_comm
 		PT
 	};
 
+	static std::vector<uint64_t> free_pml4s;
+
 	static uint64_t mal_pointer_pte_ind[4];
 	static uint64_t mal_pte_ind[4];
 	static uint64_t mal_pml4_pte_ind[4];
@@ -123,10 +125,10 @@ namespace supermode_comm
 	static uint64_t target_cr3;
 
 	static uint64_t mal_pte_offset = 0;
+	static uint64_t mal_pte2_offset = 0;
+	static uint64_t mal_pte2_pfn = 0;
 
 	static uint64_t current_pfn = 0;
-
-	static std::vector<uint64_t> free_pml4s;
 
 	struct PTE_PFN
 	{
@@ -155,6 +157,12 @@ namespace supermode_comm
 		mal_pte_offset = j["mal_pte_offset"].get<uint64_t>();
 		std::cout << "mal_pte_offset: 0x" << std::hex << mal_pte_offset << std::dec << std::endl;
 
+		mal_pte2_offset = j["mal_pte2_offset"].get<uint64_t>();
+		std::cout << "mal_pte2_offset: 0x" << std::hex << mal_pte2_offset << std::dec << std::endl;
+
+		mal_pte2_pfn = j["mal_pte2_pfn"].get<uint64_t>();
+		std::cout << "mal_pte2_pfn: 0x" << std::hex << mal_pte2_pfn << std::dec << std::endl;
+
 		for (int i = 0; i <= PT; i++)
 		{
 			mal_pointer_pte_ind[i] = j["mal_pointer_pte_indices"][std::to_string(i)].get<uint64_t>();
@@ -174,6 +182,11 @@ namespace supermode_comm
 		}
 
 		return true;
+	}
+
+	static uint64_t get_free_pml4(int idx)
+	{
+		return free_pml4s[idx];
 	}
 
 	static PTE_PFN calc_pfnpte_from_addr(uint64_t addr)
@@ -284,17 +297,18 @@ namespace supermode_comm
 		return true;
 	}
 
-	static void write_physical_memory(uint64_t addr, uint64_t size, uint64_t* data)
+	static bool write_physical_memory(uint64_t addr, uint64_t size, uint64_t* data)
 	{
 		PTE_PFN pfn = calc_pfnpte_from_addr(addr);
 
 		if (pfn.pfn != current_pfn)
-		{
 			change_mal_pt_pfn(pfn.pfn);
-			MemoryFence();
-		}
+
+		MemoryFence();
 
 		uint64_t va = generate_virtual_address(mal_pte_ind[PML4], mal_pte_ind[PDPT], mal_pte_ind[PD], mal_pte_ind[PT], pfn.offset);
+		
 		memcpy((void*)va, (void*)data, size);
+		return true;
 	}
 }

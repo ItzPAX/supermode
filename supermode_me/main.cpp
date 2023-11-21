@@ -69,10 +69,11 @@ void cheat_thread()
 	engine = supermode::get_module_base(L"engine2.dll", rwptm::target_eproc, rwptm::target_cr3);
 	std::cout << "engine2dll: " << engine << std::endl;
 
+	// we no longer need physmem access
+	rwptm::cleanup();
+
 	if (!client || !engine)
 		return;
-
-	std::ofstream out("log.txt");
 
 	view_matrix_t vm;
 	vec3 screensize = { 1920, 1080, 0 };
