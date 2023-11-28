@@ -142,12 +142,9 @@ uint64_t supermode::get_process_id(const char* image_name)
 			CloseHandle(hsnap);
 			PiD = pt.th32ProcessID;
 			return PiD;
-			if (PiD != NULL) {
-				return 0;
-			}
 		}
 	} while (Process32Next(hsnap, &pt));
-	return 1;
+	return 0;
 }
 
 uintptr_t supermode::get_process_base_um(uint64_t pid, const char* name)

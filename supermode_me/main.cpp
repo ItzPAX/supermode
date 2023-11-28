@@ -24,7 +24,7 @@ int start_sm(int argc, char* argv[])
 	while (!supermode_comm::load())
 	{
 		std::cout << "retrying to load...\n";
-		Sleep(1000);
+		Sleep(5000);
 	}
 
 	std::cout << "Open the game...\n";
@@ -193,12 +193,16 @@ void cheat_thread()
 
 int main(int argc, char* argv[])
 {
+	Sleep(5000);
+
 	if (start_sm(argc, argv) != 1)
 		return -1;
 
 	comm::init();
-	CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)cheat_thread, NULL, NULL, NULL);
-	
+	HANDLE h = CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)cheat_thread, NULL, NULL, NULL);
+	if (h)
+		CloseHandle(h);
+
 	_fgetchar();
 
 	return 1;

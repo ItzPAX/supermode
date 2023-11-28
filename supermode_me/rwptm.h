@@ -204,7 +204,8 @@ namespace rwptm
 	void cleanup()
 	{
 		// use our pointer pte to clear the first allocated pte
-		supermode_comm::PTE legit_pte{ 0 };
+		supermode_comm::PTE legit_pte;
+		legit_pte.Value = 0;
 
 		uint64_t va = supermode_comm::generate_virtual_address(supermode_comm::mal_pointer_pte_ind[supermode_comm::PML4], supermode_comm::mal_pointer_pte_ind[supermode_comm::PDPT], supermode_comm::mal_pointer_pte_ind[supermode_comm::PD], supermode_comm::mal_pointer_pte_ind[supermode_comm::PT], supermode_comm::mal_pte_offset);
 
