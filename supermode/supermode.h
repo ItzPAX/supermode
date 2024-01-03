@@ -332,7 +332,7 @@ namespace supermode
 		}
 	}
 
-	void free_pte(uint64_t ptstruct, uint64_t* ptind, bool must_be_first = false)
+	void free_pte(uint64_t ptstruct, uint64_t* ptind)
 	{
 		if (!wnbios.attached_proc || !wnbios.cr3)
 		{
